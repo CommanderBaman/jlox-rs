@@ -1,5 +1,6 @@
 mod cli;
 mod error;
+mod expression;
 mod lox;
 mod token;
 
