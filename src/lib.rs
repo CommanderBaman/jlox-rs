@@ -1,7 +1,7 @@
 mod cli;
 mod error;
 mod lox;
-mod scanner;
+mod token;
 
 use crate::error::CliError;
 
