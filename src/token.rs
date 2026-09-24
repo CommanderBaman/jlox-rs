@@ -166,9 +166,9 @@ pub fn scan_tokens(line: &str) -> Result<Vec<Token>, LanguageError> {
             '"' => {
                 let mut buffer = String::new();
                 loop {
-                    let c = chars
-                        .next()
-                        .ok_or(LanguageError::UnfinishedString(buffer.clone()))?;
+                    let c = chars.next().ok_or(
+                        LanguageError::UnfinishedString(buffer.clone()),
+                    )?;
                     if c == '"' {
                         break;
                     }
@@ -191,11 +191,9 @@ pub fn scan_tokens(line: &str) -> Result<Vec<Token>, LanguageError> {
                             break;
                         }
                     }
-                    tokens.push(Token::Number(
-                        buffer
-                            .parse()
-                            .map_err(|_| LanguageError::UnparseableNumber(buffer))?,
-                    ));
+                    tokens.push(Token::Number(buffer.parse().map_err(
+                        |_| LanguageError::UnparseableNumber(buffer),
+                    )?));
                     continue;
                 }
                 if c.is_alphabetic() {
@@ -204,7 +202,8 @@ pub fn scan_tokens(line: &str) -> Result<Vec<Token>, LanguageError> {
                     // doing it a different way than above
                     // i believe this is harder to read but the suggestion
                     // said it was more idiomatic
-                    while matches!(chars.peek(), Some(&p) if p.is_alphabetic()) {
+                    while matches!(chars.peek(), Some(&p) if p.is_alphabetic())
+                    {
                         // safe to unwrap because of check above
                         buffer.push(chars.next().unwrap());
                     }

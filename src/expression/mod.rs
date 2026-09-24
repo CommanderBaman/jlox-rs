@@ -23,9 +23,11 @@ pub struct LiteralExpression {
 impl LiteralExpression {
     pub fn new(literal: Token) -> Option<Self> {
         match literal {
-            Token::Number(_) | Token::String(_) | Token::True | Token::False | Token::Nil => {
-                Some(Self { literal })
-            }
+            Token::Number(_)
+            | Token::String(_)
+            | Token::True
+            | Token::False
+            | Token::Nil => Some(Self { literal }),
             _ => None,
         }
     }
@@ -69,7 +71,11 @@ pub struct BinaryExpression<L: Expression, R: Expression> {
     right_expression: R,
 }
 impl<L: Expression, R: Expression> BinaryExpression<L, R> {
-    pub fn new(left_expression: L, operator: Token, right_expression: R) -> Option<Self> {
+    pub fn new(
+        left_expression: L,
+        operator: Token,
+        right_expression: R,
+    ) -> Option<Self> {
         match operator {
             Token::EqualEqual
             | Token::BangEqual

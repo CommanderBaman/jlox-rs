@@ -1,7 +1,8 @@
 #![allow(dead_code)]
 
 use crate::expression::{
-    BinaryExpression, Expression, GroupingExpression, LiteralExpression, UnaryExpression,
+    BinaryExpression, Expression, GroupingExpression, LiteralExpression,
+    UnaryExpression,
 };
 
 pub trait ExpressionRpn: Expression {
@@ -20,7 +21,9 @@ impl<T: ExpressionRpn> ExpressionRpn for UnaryExpression<T> {
     }
 }
 
-impl<L: ExpressionRpn, R: ExpressionRpn> ExpressionRpn for BinaryExpression<L, R> {
+impl<L: ExpressionRpn, R: ExpressionRpn> ExpressionRpn
+    for BinaryExpression<L, R>
+{
     fn to_rpn_string(&self) -> String {
         format!(
             "{} {} {}",
@@ -59,18 +62,22 @@ mod test {
         let expression = BinaryExpression::new(
             GroupingExpression::new(
                 BinaryExpression::new(
-                    LiteralExpression::new(Token::Number(1.0)).expect("1 is literal"),
+                    LiteralExpression::new(Token::Number(1.0))
+                        .expect("1 is literal"),
                     Token::Plus,
-                    LiteralExpression::new(Token::Number(2.0)).expect("2 is literal"),
+                    LiteralExpression::new(Token::Number(2.0))
+                        .expect("2 is literal"),
                 )
                 .expect("1 + 2 is binary expression"),
             ),
             Token::Star,
             GroupingExpression::new(
                 BinaryExpression::new(
-                    LiteralExpression::new(Token::Number(4.0)).expect("4 is literal"),
+                    LiteralExpression::new(Token::Number(4.0))
+                        .expect("4 is literal"),
                     Token::Minus,
-                    LiteralExpression::new(Token::Number(3.0)).expect("3 is literal"),
+                    LiteralExpression::new(Token::Number(3.0))
+                        .expect("3 is literal"),
                 )
                 .expect("4 - 3 is binary expression"),
             ),
