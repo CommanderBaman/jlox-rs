@@ -43,6 +43,16 @@ impl Ord for Value {
             // NOTE: this total_cmp is different in behavior from partial_cmp
             (Value::Number(l), Value::Number(r)) => l.total_cmp(r),
             (Value::String(l), Value::String(r)) => l.cmp(r),
+            // NOTE: solution to challenge 1
+            //
+            // I can easily bring conversions between numbers and strings
+            // and same for bool
+            // (Value::Number(l), Value::String(r)) => l.to_string().cmp(r),
+            // (Value::String(l), Value::Number(r)) => l.cmp(&r.to_string()),
+            // But I would not introduce these
+            // because it brings confusion in the language
+            // ex, "02" < 1 because "0" < "1"
+            // Python also gives us type error when we do int vs str comparison
             (Value::Nil, Value::Nil) => Ordering::Equal,
             _ => unimplemented!(),
         }
@@ -92,6 +102,16 @@ impl Add for Value {
         match (&self, &rhs) {
             // (Value::Number(l), Value::Number(r)) => {}
             (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l + r)),
+            // NOTE: solution to challenge 2
+            (Value::String(l), Value::String(r)) => {
+                Ok(Value::String(format!("{l}{r}")))
+            }
+            (Value::String(l), Value::Number(r)) => {
+                Ok(Value::String(format!("{l}{r}")))
+            }
+            (Value::Number(l), Value::String(r)) => {
+                Ok(Value::String(format!("{l}{r}")))
+            }
             _ => Err(RuntimeError::InvalidOperation {
                 operation: "Add".to_owned(),
                 expression: get_binary_expression(self, rhs, Token::Plus),
@@ -130,7 +150,19 @@ impl Div for Value {
     type Output = Result<Value, RuntimeError>;
     fn div(self, rhs: Self) -> Self::Output {
         match (&self, &rhs) {
-            (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l / r)),
+            (Value::Number(l), Value::Number(r)) => {
+                // NOTE: solution to challenge 3
+                //
+                // previously when divided by zero, due to rust internals,
+                // the number becamse infinite
+                // now we will give a runtime error
+                if r.eq(&0.0) {
+                    return Err(RuntimeError::DivisionByZero(
+                        get_binary_expression(self, rhs, Token::Slash),
+                    ));
+                }
+                Ok(Value::Number(l / r))
+            }
             _ => Err(RuntimeError::InvalidOperation {
                 operation: "Div".to_owned(),
                 expression: get_binary_expression(self, rhs, Token::Slash),

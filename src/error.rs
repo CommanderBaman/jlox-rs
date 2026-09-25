@@ -11,6 +11,8 @@ pub enum RuntimeError {
         operation: String,
         expression: Expression,
     },
+    #[error("division by zero in expression {0:?}")]
+    DivisionByZero(Expression),
 }
 
 #[derive(Error, Debug)]
