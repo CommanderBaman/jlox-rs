@@ -1,7 +1,7 @@
 use crate::{
     error::LanguageError,
     expression::print::rpn::RpnPrinter as ExpressionPrinter,
-    parser::parse_expression, token::scan_tokens,
+    interpreter::Interpreter, parser::parse_expression, token::scan_tokens,
 };
 
 pub struct Lox {}
@@ -19,6 +19,9 @@ impl Lox {
         let expression = parse_expression(&tokens)?;
         let printer = ExpressionPrinter::new();
         println!("expression = {}", printer.to_string(&expression));
+        let interpreter = Interpreter::new();
+        let value = interpreter.evaluate(&expression)?;
+        println!("value = {}", value);
         Ok(())
     }
 }

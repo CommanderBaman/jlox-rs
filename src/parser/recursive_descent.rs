@@ -24,8 +24,9 @@ pub(super) fn parse_expression(
     let mut tokens = tokens.iter().peekable();
     let mut errors = Vec::new();
     // add a dummy expression for rust checks
-    let mut expr: Expression = LiteralExpression::new(Token::EndOfFile)
-        .expect("eof is a literal expression");
+    // I can put in anything and it would work
+    let mut expr: Expression = LiteralExpression::new(Token::Nil)
+        .expect("nil is a literal expression");
     while let Some(token) = tokens.peek() {
         match expression(&mut tokens) {
             Ok(ex) => expr = ex,

@@ -2,7 +2,16 @@ use std::{fmt::Debug, process::ExitCode};
 
 use thiserror::Error;
 
-use crate::token::Token;
+use crate::{expression::Expression, token::Token};
+
+#[derive(Error, Debug)]
+pub enum RuntimeError {
+    #[error("invalid operation {operation} on expression {expression:?}")]
+    InvalidOperation {
+        operation: String,
+        expression: Expression,
+    },
+}
 
 #[derive(Error, Debug)]
 pub enum ParseError {
@@ -36,6 +45,8 @@ pub enum LanguageError {
     },
     #[error("parse errors:\n{}", .0.iter().fold(String::new(), |acc, e| format!("{acc}\n* {e}")).split_off(1))]
     Parse(Vec<ParseError>),
+    #[error("runtime error: {0}")]
+    Runtime(#[from] RuntimeError),
 }
 
 #[derive(Error, Debug)]
@@ -50,6 +61,8 @@ pub enum CliError {
     NotFile(String),
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
+    #[error("runtime error at line {line}: {error}")]
+    Runtime { line: u64, error: RuntimeError },
 }
 
 impl From<CliError> for ExitCode {
@@ -60,6 +73,7 @@ impl From<CliError> for ExitCode {
             CliError::PathDoesNotExist(..) => ExitCode::from(66),
             CliError::NotFile(..) => ExitCode::from(66),
             CliError::Io(..) => ExitCode::from(66),
+            CliError::Runtime { .. } => ExitCode::from(70),
         }
     }
 }

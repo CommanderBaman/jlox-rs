@@ -8,6 +8,7 @@ pub mod print;
 //                | unary
 //                | binary
 //                | grouping ;
+#[derive(Clone, Debug, Display)]
 pub enum Expression {
     Literal(LiteralExpression),
     Grouping(GroupingExpression),
@@ -15,7 +16,7 @@ pub enum Expression {
     Binary(BinaryExpression),
 }
 
-trait ExpressionVisitor<R> {
+pub trait ExpressionVisitor<R> {
     fn visit_literal(&self, expression: &LiteralExpression) -> R;
     fn visit_grouping(&self, expression: &GroupingExpression) -> R;
     fn visit_unary(&self, expression: &UnaryExpression) -> R;
@@ -23,7 +24,7 @@ trait ExpressionVisitor<R> {
 }
 
 impl Expression {
-    fn accept<R, T: ExpressionVisitor<R>>(&self, visitor: &T) -> R {
+    pub fn accept<R, T: ExpressionVisitor<R>>(&self, visitor: &T) -> R {
         match self {
             Expression::Literal(l) => visitor.visit_literal(l),
             Expression::Grouping(l) => visitor.visit_grouping(l),
@@ -34,8 +35,8 @@ impl Expression {
 }
 
 // literal        → NUMBER | STRING | "true" | "false" | "nil"
-#[derive(Display)]
-enum LiteralToken {
+#[derive(Clone, Debug, Display)]
+pub enum LiteralToken {
     #[strum(to_string = "Number({0})")]
     Number(f64),
     #[strum(to_string = "String('{0}')")]
@@ -43,7 +44,6 @@ enum LiteralToken {
     True,
     False,
     Nil,
-    EndOfFile,
 }
 impl TryFrom<Token> for LiteralToken {
     type Error = LanguageError;
@@ -54,7 +54,6 @@ impl TryFrom<Token> for LiteralToken {
             Token::True => Ok(LiteralToken::True),
             Token::False => Ok(LiteralToken::False),
             Token::Nil => Ok(LiteralToken::Nil),
-            Token::EndOfFile => Ok(LiteralToken::EndOfFile),
             _ => Err(LanguageError::IncorrectTokenConversion {
                 base_token: token,
                 converted_to: "LiteralToken",
@@ -62,10 +61,14 @@ impl TryFrom<Token> for LiteralToken {
         }
     }
 }
+#[derive(Clone, Debug)]
 pub struct LiteralExpression {
-    literal: LiteralToken,
+    pub literal: LiteralToken,
 }
 impl LiteralExpression {
+    pub fn wrap(self) -> Expression {
+        Expression::Literal(self)
+    }
     pub fn new(token: Token) -> Result<Expression, LanguageError> {
         let literal = token.try_into()?;
         Ok(Expression::Literal(Self { literal }))
@@ -73,10 +76,14 @@ impl LiteralExpression {
 }
 
 // grouping       → "(" expression ")"
+#[derive(Clone, Debug)]
 pub struct GroupingExpression {
-    expression: Box<Expression>,
+    pub expression: Box<Expression>,
 }
 impl GroupingExpression {
+    pub fn wrap(self) -> Expression {
+        Expression::Grouping(self)
+    }
     pub fn new(expression: Expression) -> Expression {
         Expression::Grouping(Self {
             expression: Box::new(expression),
@@ -85,8 +92,8 @@ impl GroupingExpression {
 }
 
 // unary          → ( "-" | "!" ) expression
-#[derive(Display)]
-enum UnaryOperator {
+#[derive(Clone, Debug, Display)]
+pub enum UnaryOperator {
     Bang,
     Minus,
 }
@@ -103,11 +110,15 @@ impl TryFrom<Token> for UnaryOperator {
         }
     }
 }
+#[derive(Clone, Debug)]
 pub struct UnaryExpression {
-    operator: UnaryOperator,
-    expression: Box<Expression>,
+    pub operator: UnaryOperator,
+    pub expression: Box<Expression>,
 }
 impl UnaryExpression {
+    pub fn wrap(self) -> Expression {
+        Expression::Unary(self)
+    }
     pub fn new(
         token: Token,
         expression: Expression,
@@ -122,8 +133,8 @@ impl UnaryExpression {
 
 // binary         → expression operator expression
 // operator       → "==" | "!=" | "<" | "<=" | ">" | ">=" | "+" | "-" | "*" | "/"
-#[derive(Display)]
-enum BinaryOperator {
+#[derive(Clone, Debug, Display)]
+pub enum BinaryOperator {
     EqualEqual,
     BangEqual,
     Less,
@@ -156,12 +167,16 @@ impl TryFrom<Token> for BinaryOperator {
         }
     }
 }
+#[derive(Clone, Debug)]
 pub struct BinaryExpression {
-    left_expression: Box<Expression>,
-    operator: BinaryOperator,
-    right_expression: Box<Expression>,
+    pub left_expression: Box<Expression>,
+    pub operator: BinaryOperator,
+    pub right_expression: Box<Expression>,
 }
 impl BinaryExpression {
+    pub fn wrap(self) -> Expression {
+        Expression::Binary(self)
+    }
     pub fn new(
         left_expression: Expression,
         token: Token,

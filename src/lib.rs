@@ -1,6 +1,7 @@
 mod cli;
 mod error;
 mod expression;
+mod interpreter;
 mod lox;
 mod parser;
 mod token;

@@ -1,4 +1,7 @@
-use crate::{error::CliError, lox::Lox};
+use crate::{
+    error::{CliError, LanguageError},
+    lox::Lox,
+};
 use std::{
     env,
     fs::File,
@@ -42,9 +45,15 @@ fn run_file(path: &Path) -> Result<(), CliError> {
     let mut count = 1;
     for line in reader.lines() {
         let line = line?;
-        program.run(&line, &count).map_err(|e| CliError::Language {
-            line: count,
-            error: e,
+        program.run(&line, &count).map_err(|e| match e {
+            LanguageError::Runtime(r) => CliError::Runtime {
+                line: count,
+                error: r,
+            },
+            _ => CliError::Language {
+                line: count,
+                error: e,
+            },
         })?;
         count += 1;
     }
