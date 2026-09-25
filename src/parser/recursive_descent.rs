@@ -239,3 +239,32 @@ fn incorrect_token_error_wrap(
         }
     })
 }
+
+// solution to challenge 1
+// I thought of three solutions
+// 1. changing primary to
+// primary → ... | "nil" | "(" expression ")" | "," expression
+// but this allows expressions like ", 1 + 2"
+// 2. changing equality to
+// equality → comparison ( ( "!=" | "==" | "," ) comparison )*
+// but this causes problems with cases like "x, y == z"
+// not to mention we need to add , as a binary operator which might
+// cause problems with evaluation later on - just an intuition
+// 3. changing expression to
+// expression -> equality ( "," equality )
+// but in order to capture this we need to change the return values here
+// I don't want to disturb the current type system so. otherwise,
+// we have to return a vector everywhere instead of just expression
+
+// solution to challenge 2
+// ternary operator is right associative. ex,
+// check1 ? true1 : check2 ? true2 : false2 boils down to
+// check1 ? true1 : (check2 ? true2 : false2)
+// as for precedence, it comes between equality and comparison
+
+// solution to challenge 3
+// adding error productions for binary operator is easy, just add them
+// at the equality step accepting the operators
+// problem is that with this typing, we can't form statements with them
+// that is why i didn't add error production for + at unary
+// for such cases i think having a very verbose parse error helps
