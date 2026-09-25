@@ -1,98 +1,175 @@
-use crate::token::Token;
+use crate::{error::LanguageError, token::Token};
+use strum::Display;
 
 pub mod print;
-
-// NOTE: this doesn't really follow the visitor pattern
-// but takes help of rust trait system to implement things
-//
-// I couldn't apply the visitor system because
-// because my expression is not a single type but a trait
-// but it still follows the extension method because
 
 // Grammar
 // expression     → literal
 //                | unary
 //                | binary
 //                | grouping ;
-pub trait Expression {}
+pub enum Expression {
+    Literal(LiteralExpression),
+    Grouping(GroupingExpression),
+    Unary(UnaryExpression),
+    Binary(BinaryExpression),
+}
+
+trait ExpressionVisitor<R> {
+    fn visit_literal(&self, expression: &LiteralExpression) -> R;
+    fn visit_grouping(&self, expression: &GroupingExpression) -> R;
+    fn visit_unary(&self, expression: &UnaryExpression) -> R;
+    fn visit_binary(&self, expression: &BinaryExpression) -> R;
+}
+
+impl Expression {
+    fn accept<R, T: ExpressionVisitor<R>>(&self, visitor: &T) -> R {
+        match self {
+            Expression::Literal(l) => visitor.visit_literal(l),
+            Expression::Grouping(l) => visitor.visit_grouping(l),
+            Expression::Unary(l) => visitor.visit_unary(l),
+            Expression::Binary(l) => visitor.visit_binary(l),
+        }
+    }
+}
 
 // literal        → NUMBER | STRING | "true" | "false" | "nil"
+#[derive(Display)]
+enum LiteralToken {
+    #[strum(to_string = "Number({0})")]
+    Number(f64),
+    #[strum(to_string = "String('{0}')")]
+    String(String),
+    True,
+    False,
+    Nil,
+}
+impl TryFrom<Token> for LiteralToken {
+    type Error = LanguageError;
+    fn try_from(token: Token) -> Result<Self, Self::Error> {
+        match token {
+            Token::Number(n) => Ok(LiteralToken::Number(n)),
+            Token::String(s) => Ok(LiteralToken::String(s)),
+            Token::True => Ok(LiteralToken::True),
+            Token::False => Ok(LiteralToken::False),
+            Token::Nil => Ok(LiteralToken::Nil),
+            _ => Err(LanguageError::IncorrectTokenConversion {
+                base_token: token,
+                converted_to: "LiteralToken",
+            }),
+        }
+    }
+}
 pub struct LiteralExpression {
-    literal: Token,
+    literal: LiteralToken,
 }
 impl LiteralExpression {
-    pub fn new(literal: Token) -> Option<Self> {
-        match literal {
-            Token::Number(_)
-            | Token::String(_)
-            | Token::True
-            | Token::False
-            | Token::Nil => Some(Self { literal }),
-            _ => None,
-        }
+    pub fn new(token: Token) -> Result<Expression, LanguageError> {
+        let literal = token.try_into()?;
+        Ok(Expression::Literal(Self { literal }))
     }
 }
-impl Expression for LiteralExpression {}
 
 // grouping       → "(" expression ")"
-pub struct GroupingExpression<T: Expression> {
-    expression: T,
+pub struct GroupingExpression {
+    expression: Box<Expression>,
 }
-impl<T: Expression> GroupingExpression<T> {
-    pub fn new(expression: T) -> Self {
-        Self { expression }
+impl GroupingExpression {
+    pub fn new(expression: Expression) -> Expression {
+        Expression::Grouping(Self {
+            expression: Box::new(expression),
+        })
     }
 }
-impl<T: Expression> Expression for GroupingExpression<T> {}
 
 // unary          → ( "-" | "!" ) expression
-pub struct UnaryExpression<T: Expression> {
-    operator: Token,
-    expression: T,
+#[derive(Display)]
+enum UnaryOperator {
+    Bang,
+    Minus,
 }
-impl<T: Expression> UnaryExpression<T> {
-    pub fn new(operator: Token, expression: T) -> Option<Self> {
-        match operator {
-            Token::Bang | Token::Minus => Some(Self {
-                operator,
-                expression,
+impl TryFrom<Token> for UnaryOperator {
+    type Error = LanguageError;
+    fn try_from(token: Token) -> Result<Self, Self::Error> {
+        match token {
+            Token::Minus => Ok(UnaryOperator::Minus),
+            Token::Bang => Ok(UnaryOperator::Bang),
+            _ => Err(LanguageError::IncorrectTokenConversion {
+                base_token: token,
+                converted_to: "UnaryOperator",
             }),
-            _ => None,
         }
     }
 }
-impl<T: Expression> Expression for UnaryExpression<T> {}
+pub struct UnaryExpression {
+    operator: UnaryOperator,
+    expression: Box<Expression>,
+}
+impl UnaryExpression {
+    pub fn new(
+        token: Token,
+        expression: Expression,
+    ) -> Result<Expression, LanguageError> {
+        let operator = token.try_into()?;
+        Ok(Expression::Unary(Self {
+            operator,
+            expression: Box::new(expression),
+        }))
+    }
+}
 
 // binary         → expression operator expression
 // operator       → "==" | "!=" | "<" | "<=" | ">" | ">=" | "+" | "-" | "*" | "/"
-pub struct BinaryExpression<L: Expression, R: Expression> {
-    left_expression: L,
-    operator: Token,
-    right_expression: R,
+#[derive(Display)]
+enum BinaryOperator {
+    EqualEqual,
+    BangEqual,
+    Less,
+    LessEqual,
+    Greater,
+    GreaterEqual,
+    Plus,
+    Minus,
+    Star,
+    Slash,
 }
-impl<L: Expression, R: Expression> BinaryExpression<L, R> {
-    pub fn new(
-        left_expression: L,
-        operator: Token,
-        right_expression: R,
-    ) -> Option<Self> {
-        match operator {
-            Token::EqualEqual
-            | Token::BangEqual
-            | Token::Less
-            | Token::LessEqual
-            | Token::Greater
-            | Token::GreaterEqual
-            | Token::Plus
-            | Token::Minus
-            | Token::Star
-            | Token::Slash => Some(Self {
-                left_expression,
-                operator,
-                right_expression,
+impl TryFrom<Token> for BinaryOperator {
+    type Error = LanguageError;
+    fn try_from(token: Token) -> Result<Self, Self::Error> {
+        match token {
+            Token::EqualEqual => Ok(BinaryOperator::EqualEqual),
+            Token::BangEqual => Ok(BinaryOperator::BangEqual),
+            Token::Less => Ok(BinaryOperator::Less),
+            Token::LessEqual => Ok(BinaryOperator::LessEqual),
+            Token::Greater => Ok(BinaryOperator::Greater),
+            Token::GreaterEqual => Ok(BinaryOperator::GreaterEqual),
+            Token::Plus => Ok(BinaryOperator::Plus),
+            Token::Minus => Ok(BinaryOperator::Minus),
+            Token::Star => Ok(BinaryOperator::Star),
+            Token::Slash => Ok(BinaryOperator::Slash),
+            _ => Err(LanguageError::IncorrectTokenConversion {
+                base_token: token,
+                converted_to: "BinaryOperator",
             }),
-            _ => None,
         }
     }
 }
-impl<L: Expression, R: Expression> Expression for BinaryExpression<L, R> {}
+pub struct BinaryExpression {
+    left_expression: Box<Expression>,
+    operator: BinaryOperator,
+    right_expression: Box<Expression>,
+}
+impl BinaryExpression {
+    pub fn new(
+        left_expression: Expression,
+        token: Token,
+        right_expression: Expression,
+    ) -> Result<Expression, LanguageError> {
+        let operator = token.try_into()?;
+        Ok(Expression::Binary(Self {
+            left_expression: Box::new(left_expression),
+            operator,
+            right_expression: Box::new(right_expression),
+        }))
+    }
+}

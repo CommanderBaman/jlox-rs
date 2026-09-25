@@ -1,62 +1,63 @@
 #![allow(dead_code)]
 
-use crate::expression::{
-    BinaryExpression, Expression, GroupingExpression, LiteralExpression,
-    UnaryExpression,
-};
+use crate::expression::{Expression, ExpressionVisitor};
 
-pub trait ExpressionAstString: Expression {
-    fn to_ast_string(&self) -> String;
-}
+pub struct SimpleAstPrinter {}
 
-impl<T: ExpressionAstString> ExpressionAstString for GroupingExpression<T> {
-    fn to_ast_string(&self) -> String {
-        format!("(group {})", self.expression.to_ast_string())
-    }
-}
-
-impl<T: ExpressionAstString> ExpressionAstString for UnaryExpression<T> {
-    fn to_ast_string(&self) -> String {
-        format!("({} {})", self.operator, self.expression.to_ast_string())
-    }
-}
-
-impl<L: ExpressionAstString, R: ExpressionAstString> ExpressionAstString
-    for BinaryExpression<L, R>
-{
-    fn to_ast_string(&self) -> String {
-        format!(
-            "({} {} {})",
-            self.operator,
-            self.left_expression.to_ast_string(),
-            self.right_expression.to_ast_string()
-        )
-    }
-}
-
-impl ExpressionAstString for LiteralExpression {
-    fn to_ast_string(&self) -> String {
-        self.literal.to_string()
-    }
-}
-
-pub struct AstPrinter;
-
-impl AstPrinter {
+impl SimpleAstPrinter {
     pub fn new() -> Self {
         Self {}
     }
-    pub fn make_string<T: ExpressionAstString>(
+    pub fn to_string(&self, expression: &Expression) -> String {
+        expression.accept(self)
+    }
+}
+
+impl ExpressionVisitor<String> for SimpleAstPrinter {
+    fn visit_literal(
         &self,
-        expression: &T,
+        expression: &crate::expression::LiteralExpression,
     ) -> String {
-        expression.to_ast_string()
+        expression.literal.to_string()
+    }
+    fn visit_grouping(
+        &self,
+        expression: &crate::expression::GroupingExpression,
+    ) -> String {
+        format!("(group {})", expression.expression.accept(self))
+    }
+    fn visit_unary(
+        &self,
+        expression: &crate::expression::UnaryExpression,
+    ) -> String {
+        format!(
+            "({} {})",
+            expression.operator,
+            expression.expression.accept(self),
+        )
+    }
+    fn visit_binary(
+        &self,
+        expression: &crate::expression::BinaryExpression,
+    ) -> String {
+        format!(
+            "({} {} {})",
+            expression.operator,
+            expression.left_expression.accept(self),
+            expression.right_expression.accept(self),
+        )
     }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::{expression, token::Token};
+    use crate::{
+        expression::{
+            BinaryExpression, GroupingExpression, LiteralExpression,
+            UnaryExpression,
+        },
+        token::Token,
+    };
 
     use super::*;
 
@@ -75,9 +76,9 @@ mod test {
             ),
         ];
 
-        let printer = AstPrinter::new();
+        let printer = SimpleAstPrinter::new();
         for (expression, result) in expressions {
-            assert_eq!(result, printer.make_string(&expression))
+            assert_eq!(result, printer.to_string(&expression))
         }
     }
 
@@ -100,9 +101,9 @@ mod test {
             ),
         ];
 
-        let printer = AstPrinter::new();
+        let printer = SimpleAstPrinter::new();
         for (expression, result) in expressions {
-            assert_eq!(result, printer.make_string(&expression))
+            assert_eq!(result, printer.to_string(&expression))
         }
     }
 
@@ -122,9 +123,9 @@ mod test {
             ),
         )
         .expect("-123 * (45.67) is a correct expression");
-        let printer = AstPrinter::new();
+        let printer = SimpleAstPrinter::new();
         assert_eq!(
-            printer.make_string(&expression),
+            printer.to_string(&expression),
             "(Star (Minus Number(123)) (group Number(45.67)))"
         );
     }

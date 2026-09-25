@@ -2,6 +2,8 @@ use std::process::ExitCode;
 
 use thiserror::Error;
 
+use crate::token::Token;
+
 #[derive(Error, Debug)]
 pub enum LanguageError {
     #[error("could not recognize token: {0}")]
@@ -12,6 +14,13 @@ pub enum LanguageError {
     UnparseableNumber(String),
     #[error("the given string was not terminated: \"{0}\"")]
     UnfinishedString(String),
+    #[error(
+        "the given token {base_token} was incorrectly converted to {converted_to}"
+    )]
+    IncorrectTokenConversion {
+        base_token: Token,
+        converted_to: &'static str,
+    },
 }
 
 #[derive(Error, Debug)]

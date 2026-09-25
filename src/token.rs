@@ -2,7 +2,7 @@ use crate::error::LanguageError;
 
 use strum::Display;
 
-#[derive(Clone, Display)]
+#[derive(Clone, Debug, Display)]
 pub enum Token {
     // single character tokens
     LeftParen,

@@ -1,59 +1,60 @@
 #![allow(dead_code)]
 
-use crate::expression::{
-    BinaryExpression, Expression, GroupingExpression, LiteralExpression,
-    UnaryExpression,
-};
+use crate::expression::{Expression, ExpressionVisitor};
 
-pub trait ExpressionRpn: Expression {
-    fn to_rpn_string(&self) -> String;
-}
+pub struct RpnPrinter {}
 
-impl<T: ExpressionRpn> ExpressionRpn for GroupingExpression<T> {
-    fn to_rpn_string(&self) -> String {
-        format!("{}", self.expression.to_rpn_string())
-    }
-}
-
-impl<T: ExpressionRpn> ExpressionRpn for UnaryExpression<T> {
-    fn to_rpn_string(&self) -> String {
-        format!("{} {}", self.expression.to_rpn_string(), self.operator)
-    }
-}
-
-impl<L: ExpressionRpn, R: ExpressionRpn> ExpressionRpn
-    for BinaryExpression<L, R>
-{
-    fn to_rpn_string(&self) -> String {
-        format!(
-            "{} {} {}",
-            self.left_expression.to_rpn_string(),
-            self.right_expression.to_rpn_string(),
-            self.operator,
-        )
-    }
-}
-
-impl ExpressionRpn for LiteralExpression {
-    fn to_rpn_string(&self) -> String {
-        self.literal.to_string()
-    }
-}
-
-pub struct AstPrinter;
-
-impl AstPrinter {
+impl RpnPrinter {
     pub fn new() -> Self {
         Self {}
     }
-    pub fn to_string<T: ExpressionRpn>(&self, expression: &T) -> String {
-        expression.to_rpn_string()
+    pub fn to_string(&self, expression: &Expression) -> String {
+        expression.accept(self)
+    }
+}
+
+impl ExpressionVisitor<String> for RpnPrinter {
+    fn visit_literal(
+        &self,
+        expression: &crate::expression::LiteralExpression,
+    ) -> String {
+        expression.literal.to_string()
+    }
+    fn visit_grouping(
+        &self,
+        expression: &crate::expression::GroupingExpression,
+    ) -> String {
+        expression.expression.accept(self)
+    }
+    fn visit_unary(
+        &self,
+        expression: &crate::expression::UnaryExpression,
+    ) -> String {
+        format!(
+            "{} {}",
+            expression.expression.accept(self),
+            expression.operator
+        )
+    }
+    fn visit_binary(
+        &self,
+        expression: &crate::expression::BinaryExpression,
+    ) -> String {
+        format!(
+            "{} {} {}",
+            expression.left_expression.accept(self),
+            expression.right_expression.accept(self),
+            expression.operator
+        )
     }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::token::Token;
+    use crate::{
+        expression::{BinaryExpression, GroupingExpression, LiteralExpression},
+        token::Token,
+    };
 
     use super::*;
 
@@ -83,7 +84,7 @@ mod test {
             ),
         )
         .expect("(1 + 2) * (4 - 3) is expression");
-        let printer = AstPrinter::new();
+        let printer = RpnPrinter::new();
         assert_eq!(
             printer.to_string(&expression),
             "Number(1) Number(2) Plus Number(4) Number(3) Minus Star"
