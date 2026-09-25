@@ -52,6 +52,9 @@ pub enum Token {
     Class,
     Super,
     Print,
+
+    // special
+    EndOfFile,
 }
 
 fn keyword_to_token(keyword: &str) -> Option<Token> {

@@ -43,6 +43,7 @@ enum LiteralToken {
     True,
     False,
     Nil,
+    EndOfFile,
 }
 impl TryFrom<Token> for LiteralToken {
     type Error = LanguageError;
@@ -53,6 +54,7 @@ impl TryFrom<Token> for LiteralToken {
             Token::True => Ok(LiteralToken::True),
             Token::False => Ok(LiteralToken::False),
             Token::Nil => Ok(LiteralToken::Nil),
+            Token::EndOfFile => Ok(LiteralToken::EndOfFile),
             _ => Err(LanguageError::IncorrectTokenConversion {
                 base_token: token,
                 converted_to: "LiteralToken",

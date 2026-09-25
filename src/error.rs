@@ -1,8 +1,21 @@
-use std::process::ExitCode;
+use std::{fmt::Debug, process::ExitCode};
 
 use thiserror::Error;
 
 use crate::token::Token;
+
+#[derive(Error, Debug)]
+pub enum ParseError {
+    #[error("primary expression is incomplete")]
+    IncompletePrimaryExpression,
+    #[error("wrong token for {expression_type} expression for token {token}")]
+    WrongTokenForExpression {
+        expression_type: &'static str,
+        token: Token,
+    },
+    #[error("unknown error on token {0}")]
+    Unknown(Token),
+}
 
 #[derive(Error, Debug)]
 pub enum LanguageError {
@@ -21,6 +34,8 @@ pub enum LanguageError {
         base_token: Token,
         converted_to: &'static str,
     },
+    #[error("parse errors:\n{}", .0.iter().fold(String::new(), |acc, e| format!("{acc}\n* {e}")).split_off(1))]
+    Parse(Vec<ParseError>),
 }
 
 #[derive(Error, Debug)]
