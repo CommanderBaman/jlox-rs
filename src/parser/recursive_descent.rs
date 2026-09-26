@@ -1,5 +1,6 @@
-#![allow(unused_variables)]
-use std::{iter::Peekable, slice::Iter};
+#![allow(dead_code)]
+
+use std::{assert_matches, iter::Peekable, slice::Iter};
 
 use crate::{
     error::{LanguageError, ParseError},
@@ -7,8 +8,105 @@ use crate::{
         BinaryExpression, Expression, GroupingExpression, LiteralExpression,
         UnaryExpression,
     },
+    statement::{ExpressionStatement, PrintStatement, Statement},
     token::Token,
 };
+
+// grammar
+// program   → statement* EOF
+// statement → exprStmt | printStmt
+// exprStmt  → expression ";"
+// printStmt → "print" expression ";"
+pub(super) fn parse(
+    tokens: &Vec<Token>,
+) -> Result<Vec<Statement>, LanguageError> {
+    let mut tokens = tokens.iter().peekable();
+    let mut statements = Vec::new();
+    let mut errors = Vec::new();
+    while tokens.peek().is_some() {
+        match statement(&mut tokens) {
+            Ok(s) => statements.push(s),
+            Err(err) => {
+                errors.push(err);
+                // NOTE:
+                // we might need to have \n as end operator too alongside
+                // ';' otherwise the following will never be caught
+                // 1 + 2;
+                // 1 + 3
+                // 1 + 4
+                // can't parse after 1 + 3 and gives only that
+                //
+                // consume tokens till a clear end
+                while let Some(token) = tokens.peek() {
+                    match token {
+                        Token::Class
+                        | Token::Fun
+                        | Token::Var
+                        | Token::For
+                        | Token::If
+                        | Token::While
+                        | Token::Print
+                        | Token::Return => {
+                            break;
+                        }
+                        Token::Semicolon => {
+                            _ = tokens.next();
+                            break;
+                        }
+                        _ => {
+                            _ = tokens.next();
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if errors.is_empty() {
+        Ok(statements)
+    } else {
+        Err(LanguageError::Parse(errors))
+    }
+}
+
+fn statement(
+    tokens: &mut Peekable<Iter<Token>>,
+) -> Result<Statement, ParseError> {
+    match tokens.peek() {
+        None => unimplemented!(),
+        Some(Token::Print) => print_statement(tokens),
+        _ => expression_statement(tokens),
+    }
+}
+
+// exprStmt  → expression ";"
+fn expression_statement(
+    tokens: &mut Peekable<Iter<Token>>,
+) -> Result<Statement, ParseError> {
+    let expression = expression(tokens)?;
+    // last token has to be ;
+    if !matches!(tokens.peek(), Some(Token::Semicolon)) {
+        return Err(ParseError::UnterminatedExpression(expression));
+    }
+    // consume the ;
+    _ = tokens.next();
+    Ok(ExpressionStatement::new(expression))
+}
+
+// printStmt → "print" expression ";"
+fn print_statement(
+    tokens: &mut Peekable<Iter<Token>>,
+) -> Result<Statement, ParseError> {
+    // have to be print otherwise the function should not be called
+    assert_matches!(tokens.next(), Some(Token::Print));
+    let expression = expression(tokens)?;
+    // last token has to be ;
+    if !matches!(tokens.peek(), Some(Token::Semicolon)) {
+        return Err(ParseError::UnterminatedExpression(expression));
+    }
+    // consume the ;
+    _ = tokens.next();
+    Ok(PrintStatement::new(expression))
+}
 
 // grammar
 // expression → equality
@@ -27,7 +125,7 @@ pub(super) fn parse_expression(
     // I can put in anything and it would work
     let mut expr: Expression = LiteralExpression::new(Token::Nil)
         .expect("nil is a literal expression");
-    while let Some(token) = tokens.peek() {
+    while let Some(_) = tokens.peek() {
         match expression(&mut tokens) {
             Ok(ex) => expr = ex,
             Err(err) => {
@@ -194,12 +292,14 @@ fn primary(
         return Err(ParseError::IncompletePrimaryExpression);
     };
     match token {
-        Token::False => LiteralExpression::new(token.to_owned()).map_err(|e| {
-            ParseError::WrongTokenForExpression {
-                expression_type: "literal",
-                token: token.clone(),
-            }
-        }),
+        Token::False => {
+            LiteralExpression::new(token.to_owned()).map_err(|_| {
+                ParseError::WrongTokenForExpression {
+                    expression_type: "literal",
+                    token: token.clone(),
+                }
+            })
+        }
         Token::True => {
             incorrect_token_error_wrap(LiteralExpression::new(token.to_owned()))
         }
@@ -220,6 +320,8 @@ fn primary(
             }
             Ok(GroupingExpression::new(expression))
         }
+        // FIX: cases found till now
+        // 1 + ;
         _ => Err(ParseError::Unknown(token.to_owned())),
     }
 }

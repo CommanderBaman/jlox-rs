@@ -24,6 +24,8 @@ pub enum ParseError {
         expression_type: &'static str,
         token: Token,
     },
+    #[error("expression does not end with semi colon: {0}")]
+    UnterminatedExpression(Expression),
     #[error("unknown error on token {0}")]
     Unknown(Token),
 }

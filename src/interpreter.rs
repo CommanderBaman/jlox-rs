@@ -12,6 +12,7 @@ use crate::{
         GroupingExpression, LiteralExpression, LiteralToken, UnaryExpression,
         UnaryOperator,
     },
+    statement::{Statement, StatementVisitor},
     token::Token,
 };
 
@@ -183,6 +184,18 @@ impl Interpreter {
     ) -> Result<Value, RuntimeError> {
         expression.accept(self)
     }
+    pub fn interpret(
+        &mut self,
+        statements: &Vec<Statement>,
+    ) -> Result<(), RuntimeError> {
+        for statement in statements {
+            self.execute(statement)?;
+        }
+        Ok(())
+    }
+    fn execute(&self, statement: &Statement) -> Result<Value, RuntimeError> {
+        statement.accept(self)
+    }
 }
 
 impl ExpressionVisitor<Result<Value, RuntimeError>> for Interpreter {
@@ -253,6 +266,23 @@ impl ExpressionVisitor<Result<Value, RuntimeError>> for Interpreter {
             BinaryOperator::Star => left_value * right_value,
             BinaryOperator::Slash => left_value / right_value,
         }
+    }
+}
+
+impl StatementVisitor<Result<Value, RuntimeError>> for Interpreter {
+    fn visit_print(
+        &self,
+        statement: &crate::statement::PrintStatement,
+    ) -> Result<Value, RuntimeError> {
+        let value = self.evaluate(&statement.expression)?;
+        println!("{value}");
+        Ok(value)
+    }
+    fn visit_expression(
+        &self,
+        statement: &crate::statement::ExpressionStatement,
+    ) -> Result<Value, RuntimeError> {
+        self.evaluate(&statement.expression)
     }
 }
 

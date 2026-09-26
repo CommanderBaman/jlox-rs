@@ -4,6 +4,7 @@ mod expression;
 mod interpreter;
 mod lox;
 mod parser;
+mod statement;
 mod token;
 
 use crate::error::CliError;

@@ -10,9 +10,11 @@ pub mod print;
 //                | grouping ;
 #[derive(Clone, Debug, Display)]
 pub enum Expression {
+    #[strum(to_string = "LiteralExpr({0})")]
     Literal(LiteralExpression),
     Grouping(GroupingExpression),
     Unary(UnaryExpression),
+    #[strum(to_string = "BinaryExpr({0})")]
     Binary(BinaryExpression),
 }
 
@@ -72,6 +74,12 @@ impl LiteralExpression {
     pub fn new(token: Token) -> Result<Expression, LanguageError> {
         let literal = token.try_into()?;
         Ok(Expression::Literal(Self { literal }))
+    }
+}
+
+impl std::fmt::Display for LiteralExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.literal.to_string())
     }
 }
 
@@ -188,5 +196,17 @@ impl BinaryExpression {
             operator,
             right_expression: Box::new(right_expression),
         }))
+    }
+}
+
+impl std::fmt::Display for BinaryExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} {} {}",
+            self.left_expression.to_string(),
+            self.operator,
+            self.right_expression.to_string()
+        )
     }
 }
