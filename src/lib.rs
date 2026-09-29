@@ -1,4 +1,5 @@
 mod cli;
+mod environment;
 mod error;
 mod expression;
 mod interpreter;

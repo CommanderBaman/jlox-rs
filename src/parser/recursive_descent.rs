@@ -1,22 +1,24 @@
-#![allow(dead_code)]
-
 use std::{assert_matches, iter::Peekable, slice::Iter};
 
 use crate::{
     error::{LanguageError, ParseError},
     expression::{
-        BinaryExpression, Expression, GroupingExpression, LiteralExpression,
-        UnaryExpression,
+        AssignmentExpression, BinaryExpression, Expression, GroupingExpression,
+        LiteralExpression, UnaryExpression, VariableExpression,
     },
-    statement::{ExpressionStatement, PrintStatement, Statement},
+    statement::{
+        ExpressionStatement, PrintStatement, Statement,
+        VariableDeclarationStatement,
+    },
     token::Token,
 };
 
 // grammar
 // program   → statement* EOF
-// statement → exprStmt | printStmt
+// statement -> variableDeclaration | exprStmt | printStmt
 // exprStmt  → expression ";"
 // printStmt → "print" expression ";"
+// variableDeclaration -> "var" IDENTIFIER ( "=" expression )? ";"
 pub(super) fn parse(
     tokens: &Vec<Token>,
 ) -> Result<Vec<Statement>, LanguageError> {
@@ -68,12 +70,17 @@ pub(super) fn parse(
     }
 }
 
+// NOTE: it might be better to extract out the ";" logic into this
+// but I don't know what other statements are there so leaving it
 fn statement(
     tokens: &mut Peekable<Iter<Token>>,
 ) -> Result<Statement, ParseError> {
     match tokens.peek() {
-        None => unimplemented!(),
+        // NOTE: can not be reached because previous loop
+        // ensures that it breaks on a none
+        None => unreachable!(),
         Some(Token::Print) => print_statement(tokens),
+        Some(Token::Var) => variable_declaration_statement(tokens),
         _ => expression_statement(tokens),
     }
 }
@@ -85,7 +92,7 @@ fn expression_statement(
     let expression = expression(tokens)?;
     // last token has to be ;
     if !matches!(tokens.peek(), Some(Token::Semicolon)) {
-        return Err(ParseError::UnterminatedExpression(expression));
+        return Err(ParseError::UnterminatedStatement(expression.to_string()));
     }
     // consume the ;
     _ = tokens.next();
@@ -101,21 +108,59 @@ fn print_statement(
     let expression = expression(tokens)?;
     // last token has to be ;
     if !matches!(tokens.peek(), Some(Token::Semicolon)) {
-        return Err(ParseError::UnterminatedExpression(expression));
+        return Err(ParseError::UnterminatedStatement(expression.to_string()));
     }
     // consume the ;
     _ = tokens.next();
     Ok(PrintStatement::new(expression))
 }
 
+// variableDeclaration -> "var" IDENTIFIER ( "=" expression )? ";"
+fn variable_declaration_statement(
+    tokens: &mut Peekable<Iter<Token>>,
+) -> Result<Statement, ParseError> {
+    let mut statement_string = String::new();
+    // have to be var otherwise the function should not be called
+    assert_matches!(tokens.next(), Some(Token::Var));
+    statement_string.push_str("var ");
+
+    let variable_token = match tokens.next() {
+        Some(token @ Token::Identifier(i)) => {
+            statement_string.push_str(i);
+            token
+        }
+        t => return Err(ParseError::IncompleteVariableDeclaration(t.cloned())),
+    };
+
+    let mut expr = None;
+    if matches!(tokens.peek(), Some(Token::Equal)) {
+        _ = tokens.next();
+        let expr_inner = expression(tokens)?;
+        statement_string.push_str(&expr_inner.to_string());
+        expr = Some(expr_inner);
+    }
+
+    if !matches!(tokens.peek(), Some(Token::Semicolon)) {
+        return Err(ParseError::UnterminatedStatement(statement_string));
+    }
+    _ = tokens.next();
+
+    incorrect_token_error_wrap(VariableDeclarationStatement::new(
+        variable_token.clone(),
+        expr,
+    ))
+}
+
 // grammar
-// expression → equality
-// equality   → comparison ( ( "!=" | "==" ) comparison )*
-// comparison → term ( ( ">" | ">=" | "<" | "<=" ) term )*
-// term       → factor ( ( "-" | "+" ) factor )*
-// factor     → unary ( ( "/" | "*" ) unary )*
-// unary      → ( "!" | "-" ) unary | primary
-// primary    → NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")"
+// expression -> assignment
+// assignment -> IDENTIFIER "=" assignment | equality
+// equality   -> comparison ( ( "!=" | "==" ) comparison )*
+// comparison -> term ( ( ">" | ">=" | "<" | "<=" ) term )*
+// term       -> factor ( ( "-" | "+" ) factor )*
+// factor     -> unary ( ( "/" | "*" ) unary )*
+// unary      -> ( "!" | "-" ) unary | primary
+// primary    -> NUMBER | STRING | "true" | "false" | "nil"
+//              | "(" expression ")" | IDENTIFIER
 pub(super) fn parse_expression(
     tokens: &Vec<Token>,
 ) -> Result<Expression, LanguageError> {
@@ -159,14 +204,36 @@ pub(super) fn parse_expression(
     }
 }
 
-// expression → equality
+// expression -> assignment
 fn expression(
     tokens: &mut Peekable<Iter<Token>>,
 ) -> Result<Expression, ParseError> {
-    equality(tokens)
+    assignment(tokens)
 }
 
-// equality   → comparison ( ( "!=" | "==" ) comparison )*
+// assignment -> IDENTIFIER "=" assignment | equality
+fn assignment(
+    tokens: &mut Peekable<Iter<Token>>,
+) -> Result<Expression, ParseError> {
+    let expr = equality(tokens)?;
+    if matches!(tokens.peek(), Some(Token::Equal)) {
+        let token = tokens.next();
+        assert_matches!(token, Some(Token::Equal));
+
+        let value = assignment(tokens)?;
+        match expr {
+            Expression::Variable(v) => {
+                return Ok(AssignmentExpression::from(v.variable, value));
+            }
+            _ => {
+                return Err(ParseError::InvalidAssignment(expr));
+            }
+        }
+    }
+    Ok(expr)
+}
+
+// equality -> comparison ( ( "!=" | "==" ) comparison )*
 fn equality(
     tokens: &mut Peekable<Iter<Token>>,
 ) -> Result<Expression, ParseError> {
@@ -284,7 +351,8 @@ fn unary(tokens: &mut Peekable<Iter<Token>>) -> Result<Expression, ParseError> {
     }
 }
 
-// primary → NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")"
+// primary → NUMBER | STRING | "true" | "false" | "nil"
+//          | "(" expression ")" | IDENTIFIER
 fn primary(
     tokens: &mut Peekable<Iter<Token>>,
 ) -> Result<Expression, ParseError> {
@@ -292,24 +360,11 @@ fn primary(
         return Err(ParseError::IncompletePrimaryExpression);
     };
     match token {
-        Token::False => {
-            LiteralExpression::new(token.to_owned()).map_err(|_| {
-                ParseError::WrongTokenForExpression {
-                    expression_type: "literal",
-                    token: token.clone(),
-                }
-            })
-        }
-        Token::True => {
-            incorrect_token_error_wrap(LiteralExpression::new(token.to_owned()))
-        }
-        Token::Nil => {
-            incorrect_token_error_wrap(LiteralExpression::new(token.to_owned()))
-        }
-        Token::Number(_) => {
-            incorrect_token_error_wrap(LiteralExpression::new(token.to_owned()))
-        }
-        Token::String(_) => {
+        Token::False
+        | Token::True
+        | Token::Nil
+        | Token::Number(_)
+        | Token::String(_) => {
             incorrect_token_error_wrap(LiteralExpression::new(token.to_owned()))
         }
         Token::LeftParen => {
@@ -320,15 +375,18 @@ fn primary(
             }
             Ok(GroupingExpression::new(expression))
         }
+        Token::Identifier(_) => incorrect_token_error_wrap(
+            VariableExpression::new(token.to_owned()),
+        ),
         // FIX: cases found till now
         // 1 + ;
         _ => Err(ParseError::Unknown(token.to_owned())),
     }
 }
 
-fn incorrect_token_error_wrap(
-    expression: Result<Expression, LanguageError>,
-) -> Result<Expression, ParseError> {
+fn incorrect_token_error_wrap<T>(
+    expression: Result<T, LanguageError>,
+) -> Result<T, ParseError> {
     expression.map_err(|e| match e {
         LanguageError::IncorrectTokenConversion {
             base_token,
@@ -343,6 +401,7 @@ fn incorrect_token_error_wrap(
     })
 }
 
+// for chapter 6
 // solution to challenge 1
 // I thought of three solutions
 // 1. changing primary to

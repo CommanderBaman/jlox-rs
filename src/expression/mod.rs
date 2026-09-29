@@ -16,22 +16,30 @@ pub enum Expression {
     Unary(UnaryExpression),
     #[strum(to_string = "BinaryExpr({0})")]
     Binary(BinaryExpression),
+    Variable(VariableExpression),
+    Assignment(AssignmentExpression),
 }
 
+// NOTE: we require mutable expression where ever we might need to evaluate
+// because assignment expression mutates the visitor
 pub trait ExpressionVisitor<R> {
     fn visit_literal(&self, expression: &LiteralExpression) -> R;
-    fn visit_grouping(&self, expression: &GroupingExpression) -> R;
-    fn visit_unary(&self, expression: &UnaryExpression) -> R;
-    fn visit_binary(&self, expression: &BinaryExpression) -> R;
+    fn visit_grouping(&mut self, expression: &GroupingExpression) -> R;
+    fn visit_unary(&mut self, expression: &UnaryExpression) -> R;
+    fn visit_binary(&mut self, expression: &BinaryExpression) -> R;
+    fn visit_variable(&self, expression: &VariableExpression) -> R;
+    fn visit_assignment(&mut self, expression: &AssignmentExpression) -> R;
 }
 
 impl Expression {
-    pub fn accept<R, T: ExpressionVisitor<R>>(&self, visitor: &T) -> R {
+    pub fn accept<R, T: ExpressionVisitor<R>>(&self, visitor: &mut T) -> R {
         match self {
             Expression::Literal(l) => visitor.visit_literal(l),
             Expression::Grouping(l) => visitor.visit_grouping(l),
             Expression::Unary(l) => visitor.visit_unary(l),
             Expression::Binary(l) => visitor.visit_binary(l),
+            Expression::Variable(l) => visitor.visit_variable(l),
+            Expression::Assignment(l) => visitor.visit_assignment(l),
         }
     }
 }
@@ -207,6 +215,73 @@ impl std::fmt::Display for BinaryExpression {
             self.left_expression.to_string(),
             self.operator,
             self.right_expression.to_string()
+        )
+    }
+}
+
+// variable -> IDENTIFIER
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash)]
+pub enum VariableToken {
+    #[strum(to_string = "Identifier({0})")]
+    Identifer(String),
+}
+impl TryFrom<Token> for VariableToken {
+    type Error = LanguageError;
+    fn try_from(token: Token) -> Result<Self, Self::Error> {
+        match token {
+            Token::Identifier(i) => Ok(VariableToken::Identifer(i)),
+            _ => Err(LanguageError::IncorrectTokenConversion {
+                base_token: token,
+                converted_to: "VariableToken",
+            }),
+        }
+    }
+}
+#[derive(Clone, Debug)]
+pub struct VariableExpression {
+    pub variable: VariableToken,
+}
+impl VariableExpression {
+    pub fn wrap(self) -> Expression {
+        Expression::Variable(self)
+    }
+    pub fn new(token: Token) -> Result<Expression, LanguageError> {
+        let variable = token.try_into()?;
+        Ok(Expression::Variable(Self { variable }))
+    }
+}
+
+impl std::fmt::Display for VariableExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.variable.to_string())
+    }
+}
+
+// assignment -> IDENTIFIER = expression
+#[derive(Clone, Debug)]
+pub struct AssignmentExpression {
+    pub variable: VariableToken,
+    pub expression: Box<Expression>,
+}
+impl AssignmentExpression {
+    pub fn wrap(self) -> Expression {
+        Expression::Assignment(self)
+    }
+    pub fn from(variable: VariableToken, expression: Expression) -> Expression {
+        Expression::Assignment(Self {
+            variable,
+            expression: Box::new(expression),
+        })
+    }
+}
+
+impl std::fmt::Display for AssignmentExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} = {}",
+            self.variable.to_string(),
+            self.expression.to_string()
         )
     }
 }

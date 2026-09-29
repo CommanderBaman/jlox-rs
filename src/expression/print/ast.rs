@@ -1,6 +1,8 @@
 #![allow(dead_code)]
 
-use crate::expression::{Expression, ExpressionVisitor};
+use crate::expression::{
+    AssignmentExpression, Expression, ExpressionVisitor, VariableExpression,
+};
 
 pub struct SimpleAstPrinter {}
 
@@ -8,7 +10,7 @@ impl SimpleAstPrinter {
     pub fn new() -> Self {
         Self {}
     }
-    pub fn to_string(&self, expression: &Expression) -> String {
+    pub fn to_string(&mut self, expression: &Expression) -> String {
         expression.accept(self)
     }
 }
@@ -21,13 +23,13 @@ impl ExpressionVisitor<String> for SimpleAstPrinter {
         expression.literal.to_string()
     }
     fn visit_grouping(
-        &self,
+        &mut self,
         expression: &crate::expression::GroupingExpression,
     ) -> String {
         format!("(group {})", expression.expression.accept(self))
     }
     fn visit_unary(
-        &self,
+        &mut self,
         expression: &crate::expression::UnaryExpression,
     ) -> String {
         format!(
@@ -37,7 +39,7 @@ impl ExpressionVisitor<String> for SimpleAstPrinter {
         )
     }
     fn visit_binary(
-        &self,
+        &mut self,
         expression: &crate::expression::BinaryExpression,
     ) -> String {
         format!(
@@ -46,6 +48,15 @@ impl ExpressionVisitor<String> for SimpleAstPrinter {
             expression.left_expression.accept(self),
             expression.right_expression.accept(self),
         )
+    }
+    fn visit_variable(&self, expression: &VariableExpression) -> String {
+        format!("(variable {})", expression.variable)
+    }
+    fn visit_assignment(
+        &mut self,
+        _expression: &AssignmentExpression,
+    ) -> String {
+        unimplemented!()
     }
 }
 

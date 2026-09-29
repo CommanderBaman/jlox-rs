@@ -6,17 +6,21 @@ use std::{
 use strum::Display;
 
 use crate::{
+    environment::Environment,
     error::RuntimeError,
     expression::{
-        BinaryExpression, BinaryOperator, Expression, ExpressionVisitor,
-        GroupingExpression, LiteralExpression, LiteralToken, UnaryExpression,
-        UnaryOperator,
+        AssignmentExpression, BinaryExpression, BinaryOperator, Expression,
+        ExpressionVisitor, GroupingExpression, LiteralExpression, LiteralToken,
+        UnaryExpression, UnaryOperator, VariableExpression,
     },
-    statement::{Statement, StatementVisitor},
+    statement::{
+        ExpressionStatement, PrintStatement, Statement, StatementVisitor,
+        VariableDeclarationStatement,
+    },
     token::Token,
 };
 
-#[derive(Display, PartialEq, PartialOrd)]
+#[derive(Display, PartialEq, PartialOrd, Clone)]
 pub enum Value {
     #[strum(to_string = "{0}")]
     Bool(bool),
@@ -34,7 +38,7 @@ impl Value {
     }
 }
 
-// TODO: read why can't we derive Eq?
+// TODO: research why can't we derive Eq?
 impl Eq for Value {}
 
 impl Ord for Value {
@@ -172,14 +176,18 @@ impl Div for Value {
     }
 }
 
-pub struct Interpreter {}
+pub struct Interpreter {
+    environment: Environment,
+}
 
 impl Interpreter {
     pub fn new() -> Self {
-        Interpreter {}
+        Interpreter {
+            environment: Environment::new(),
+        }
     }
     pub fn evaluate(
-        &self,
+        &mut self,
         expression: &Expression,
     ) -> Result<Value, RuntimeError> {
         expression.accept(self)
@@ -193,7 +201,10 @@ impl Interpreter {
         }
         Ok(())
     }
-    fn execute(&self, statement: &Statement) -> Result<Value, RuntimeError> {
+    fn execute(
+        &mut self,
+        statement: &Statement,
+    ) -> Result<Value, RuntimeError> {
         statement.accept(self)
     }
 }
@@ -212,13 +223,13 @@ impl ExpressionVisitor<Result<Value, RuntimeError>> for Interpreter {
         }
     }
     fn visit_grouping(
-        &self,
+        &mut self,
         expression: &GroupingExpression,
     ) -> Result<Value, RuntimeError> {
         self.evaluate(expression.expression.as_ref())
     }
     fn visit_unary(
-        &self,
+        &mut self,
         expression: &UnaryExpression,
     ) -> Result<Value, RuntimeError> {
         let mut value = self.evaluate(&expression.expression)?;
@@ -236,7 +247,7 @@ impl ExpressionVisitor<Result<Value, RuntimeError>> for Interpreter {
         Ok(value)
     }
     fn visit_binary(
-        &self,
+        &mut self,
         expression: &BinaryExpression,
     ) -> Result<Value, RuntimeError> {
         let left_value = self.evaluate(&expression.left_expression)?;
@@ -267,22 +278,56 @@ impl ExpressionVisitor<Result<Value, RuntimeError>> for Interpreter {
             BinaryOperator::Slash => left_value / right_value,
         }
     }
+    fn visit_variable(
+        &self,
+        expression: &VariableExpression,
+    ) -> Result<Value, RuntimeError> {
+        self.environment
+            .get(&expression.variable)
+            .cloned()
+            .ok_or_else(|| {
+                RuntimeError::VariableNotFound(expression.variable.to_string())
+            })
+    }
+    fn visit_assignment(
+        &mut self,
+        expression: &AssignmentExpression,
+    ) -> Result<Value, RuntimeError> {
+        let value = self.evaluate(&expression.expression)?;
+        self.environment
+            .assign(&expression.variable, value.clone())?;
+        Ok(value)
+    }
 }
 
 impl StatementVisitor<Result<Value, RuntimeError>> for Interpreter {
     fn visit_print(
-        &self,
-        statement: &crate::statement::PrintStatement,
+        &mut self,
+        statement: &PrintStatement,
     ) -> Result<Value, RuntimeError> {
         let value = self.evaluate(&statement.expression)?;
         println!("{value}");
         Ok(value)
     }
     fn visit_expression(
-        &self,
-        statement: &crate::statement::ExpressionStatement,
+        &mut self,
+        statement: &ExpressionStatement,
     ) -> Result<Value, RuntimeError> {
         self.evaluate(&statement.expression)
+    }
+    fn visit_variable_declaration(
+        &mut self,
+        statement: &VariableDeclarationStatement,
+    ) -> Result<Value, RuntimeError> {
+        let value = statement
+            .expression
+            .as_ref()
+            .map(|ex| self.evaluate(ex))
+            .transpose()?
+            .unwrap_or(Value::Nil);
+        self.environment
+            .define(statement.name.clone(), value.clone());
+        Ok(value)
     }
 }
 

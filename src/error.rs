@@ -13,6 +13,8 @@ pub enum RuntimeError {
     },
     #[error("division by zero in expression {0:?}")]
     DivisionByZero(Expression),
+    #[error("variable {0} not found in environment")]
+    VariableNotFound(String),
 }
 
 #[derive(Error, Debug)]
@@ -24,8 +26,14 @@ pub enum ParseError {
         expression_type: &'static str,
         token: Token,
     },
-    #[error("expression does not end with semi colon: {0}")]
-    UnterminatedExpression(Expression),
+    #[error("statement does not end with semi colon: {0}")]
+    UnterminatedStatement(String),
+    #[error("received token {0:?} instead of identifier after 'var' keyword")]
+    IncompleteVariableDeclaration(Option<Token>),
+    #[error(
+        "received expresssion {0} instead of variable expression in assignment"
+    )]
+    InvalidAssignment(Expression),
     #[error("unknown error on token {0}")]
     Unknown(Token),
 }

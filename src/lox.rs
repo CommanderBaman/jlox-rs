@@ -6,14 +6,18 @@ use crate::{
     token::scan_tokens,
 };
 
-pub struct Lox {}
+pub struct Lox {
+    interpreter: Interpreter,
+}
 
 impl Lox {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            interpreter: Interpreter::new(),
+        }
     }
     pub fn run(
-        &self,
+        &mut self,
         line: &str,
         _line_number: &u64,
     ) -> Result<(), LanguageError> {
@@ -28,8 +32,7 @@ impl Lox {
         // println!("value = {}", value);
 
         let statements = parse(&tokens)?;
-        let mut interpreter = Interpreter::new();
-        interpreter.interpret(&statements)?;
+        self.interpreter.interpret(&statements)?;
         Ok(())
     }
 }
