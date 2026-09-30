@@ -14,8 +14,8 @@ use crate::{
         UnaryExpression, UnaryOperator, VariableExpression,
     },
     statement::{
-        ExpressionStatement, PrintStatement, Statement, StatementVisitor,
-        VariableDeclarationStatement,
+        BlockStatement, ExpressionStatement, PrintStatement, Statement,
+        StatementVisitor, VariableDeclarationStatement,
     },
     token::Token,
 };
@@ -328,6 +328,23 @@ impl StatementVisitor<Result<Value, RuntimeError>> for Interpreter {
         self.environment
             .define(statement.name.clone(), value.clone());
         Ok(value)
+    }
+    fn visit_block(
+        &mut self,
+        statement: &BlockStatement,
+    ) -> Result<Value, RuntimeError> {
+        self.environment.push_child();
+        for statement in &statement.statements {
+            match self.execute(&statement) {
+                Ok(_) => {}
+                Err(e) => {
+                    self.environment.pop_child()?;
+                    return Err(e);
+                }
+            }
+        }
+        self.environment.pop_child()?;
+        Ok(Value::Nil)
     }
 }
 

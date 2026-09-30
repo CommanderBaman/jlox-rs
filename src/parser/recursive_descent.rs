@@ -7,18 +7,19 @@ use crate::{
         LiteralExpression, UnaryExpression, VariableExpression,
     },
     statement::{
-        ExpressionStatement, PrintStatement, Statement,
+        BlockStatement, ExpressionStatement, PrintStatement, Statement,
         VariableDeclarationStatement,
     },
     token::Token,
 };
 
 // grammar
-// program   → statement* EOF
-// statement -> variableDeclaration | exprStmt | printStmt
-// exprStmt  → expression ";"
-// printStmt → "print" expression ";"
+// program   -> statement* EOF
+// statement -> variableDeclaration | exprStmt | printStmt | blockStmt
+// exprStmt  -> expression ";"
+// printStmt -> "print" expression ";"
 // variableDeclaration -> "var" IDENTIFIER ( "=" expression )? ";"
+// blockStmt -> "{" statement* "}"
 pub(super) fn parse(
     tokens: &Vec<Token>,
 ) -> Result<Vec<Statement>, LanguageError> {
@@ -70,7 +71,7 @@ pub(super) fn parse(
     }
 }
 
-// NOTE: it might be better to extract out the ";" logic into this
+// TODO: it might be better to extract out the ";" logic into this
 // but I don't know what other statements are there so leaving it
 fn statement(
     tokens: &mut Peekable<Iter<Token>>,
@@ -81,6 +82,7 @@ fn statement(
         None => unreachable!(),
         Some(Token::Print) => print_statement(tokens),
         Some(Token::Var) => variable_declaration_statement(tokens),
+        Some(Token::LeftBrace) => block_statement(tokens),
         _ => expression_statement(tokens),
     }
 }
@@ -149,6 +151,36 @@ fn variable_declaration_statement(
         variable_token.clone(),
         expr,
     ))
+}
+
+// blockStmt -> "{" statement* "}"
+fn block_statement(
+    tokens: &mut Peekable<Iter<Token>>,
+) -> Result<Statement, ParseError> {
+    // have to be { otherwise function should not be called
+    assert_matches!(tokens.next(), Some(Token::LeftBrace));
+
+    let mut statements = Vec::new();
+    while let Some(token) = tokens.peek() {
+        match token {
+            Token::RightBrace => {
+                assert_matches!(tokens.next(), Some(Token::RightBrace));
+                return Ok(BlockStatement::new(statements));
+            }
+            _ => {
+                statements.push(statement(tokens)?);
+            }
+        }
+    }
+    let statements_string = statements
+        .into_iter()
+        .map(|statement| statement.to_string())
+        .reduce(|acc, statement| acc + "; " + &statement)
+        .unwrap_or_default();
+    Err(ParseError::UnterminatedBlock(format!(
+        "{{ {}",
+        statements_string
+    )))
 }
 
 // grammar

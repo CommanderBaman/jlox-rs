@@ -15,6 +15,8 @@ pub enum RuntimeError {
     DivisionByZero(Expression),
     #[error("variable {0} not found in environment")]
     VariableNotFound(String),
+    #[error("code tried to remove root environment")]
+    RootEnvironmentRemoved,
 }
 
 #[derive(Error, Debug)]
@@ -28,6 +30,8 @@ pub enum ParseError {
     },
     #[error("statement does not end with semi colon: {0}")]
     UnterminatedStatement(String),
+    #[error("block does not end: {0}")]
+    UnterminatedBlock(String),
     #[error("received token {0:?} instead of identifier after 'var' keyword")]
     IncompleteVariableDeclaration(Option<Token>),
     #[error(

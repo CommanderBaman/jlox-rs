@@ -10,13 +10,16 @@ use crate::{
 
 // NOTE: diverged a bit from the grammar notation
 // everything else remains same
+// I merged declaration into statement
+//
 //
 // grammar
 // program   -> statement* EOF
-// statement -> variableDeclaration | exprStmt | printStmt
-// exprStmt  → expression ";"
-// printStmt → "print" expression ";"
+// statement -> variableDeclaration | exprStmt | printStmt | blockStmt
+// exprStmt  -> expression ";"
+// printStmt -> "print" expression ";"
 // variableDeclaration -> "var" IDENTIFIER ( "=" expression )? ";"
+// blockStmt -> "{" statement* "}"
 #[derive(Debug, Display)]
 pub enum Statement {
     #[strum(to_string = "Expression({0:?})")]
@@ -25,6 +28,8 @@ pub enum Statement {
     Print(PrintStatement),
     #[strum(to_string = "VariableDeclaration({0:?})")]
     VariableDeclaration(VariableDeclarationStatement),
+    #[strum(to_string = "Block({0:?})")]
+    Block(BlockStatement),
 }
 
 pub trait StatementVisitor<R> {
@@ -37,6 +42,7 @@ pub trait StatementVisitor<R> {
         &mut self,
         statement: &VariableDeclarationStatement,
     ) -> R;
+    fn visit_block(&mut self, statement: &BlockStatement) -> R;
 }
 
 impl Statement {
@@ -47,6 +53,7 @@ impl Statement {
             Statement::VariableDeclaration(s) => {
                 visitor.visit_variable_declaration(s)
             }
+            Statement::Block(s) => visitor.visit_block(s),
         }
     }
 }
@@ -91,5 +98,17 @@ impl VariableDeclarationStatement {
             name: name.try_into()?,
             expression,
         }))
+    }
+}
+
+// block
+#[derive(Debug)]
+pub struct BlockStatement {
+    pub statements: Vec<Statement>,
+}
+
+impl BlockStatement {
+    pub fn new(statements: Vec<Statement>) -> Statement {
+        Statement::Block(Self { statements })
     }
 }
