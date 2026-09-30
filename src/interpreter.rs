@@ -178,12 +178,14 @@ impl Div for Value {
 
 pub struct Interpreter {
     environment: Environment,
+    print_expression: bool,
 }
 
 impl Interpreter {
-    pub fn new() -> Self {
+    pub fn new(print_expression: bool) -> Self {
         Interpreter {
             environment: Environment::new(),
+            print_expression,
         }
     }
     pub fn evaluate(
@@ -196,9 +198,21 @@ impl Interpreter {
         &mut self,
         statements: &Vec<Statement>,
     ) -> Result<(), RuntimeError> {
+        let mut last_value = Value::Nil;
         for statement in statements {
-            self.execute(statement)?;
+            last_value = self.execute(statement)?;
         }
+        if self.print_expression
+            && let Some(Statement::Expression(statement)) = statements.last()
+        {
+            // could have used matches! macro
+            match statement.expression {
+                Expression::Assignment(_) => {}
+                _ => {
+                    println!("{last_value}");
+                }
+            }
+        };
         Ok(())
     }
     fn execute(
@@ -338,6 +352,7 @@ impl StatementVisitor<Result<Value, RuntimeError>> for Interpreter {
             match self.execute(&statement) {
                 Ok(_) => {}
                 Err(e) => {
+                    // how much I wish there was a defer
                     self.environment.pop_child()?;
                     return Err(e);
                 }

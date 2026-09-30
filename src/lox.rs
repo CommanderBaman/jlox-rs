@@ -8,12 +8,14 @@ use crate::{
 
 pub struct Lox {
     interpreter: Interpreter,
+    // interactive: bool,
 }
 
 impl Lox {
-    pub fn new() -> Self {
+    pub fn new(interactive: bool) -> Self {
         Self {
-            interpreter: Interpreter::new(),
+            interpreter: Interpreter::new(interactive),
+            // interactive,
         }
     }
     pub fn run(

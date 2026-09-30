@@ -41,7 +41,7 @@ fn run_file(path: &Path) -> Result<(), CliError> {
     let file = File::open(path)?;
     let mut reader = BufReader::new(file);
 
-    let mut program = Lox::new();
+    let mut program = Lox::new(false);
     let line_count = 1;
 
     let mut lines = String::new();
@@ -61,7 +61,7 @@ fn run_file(path: &Path) -> Result<(), CliError> {
 }
 
 fn run_prompt() -> Result<(), CliError> {
-    let mut program = Lox::new();
+    let mut program = Lox::new(true);
     let mut input = String::new();
     println!("starting lox interpreter");
     let mut line_count = 1;
