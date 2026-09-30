@@ -17,6 +17,7 @@ use crate::{
     statement::{
         BlockStatement, ExpressionStatement, IfStatement, PrintStatement,
         Statement, StatementVisitor, VariableDeclarationStatement,
+        WhileStatement,
     },
     token::Token,
 };
@@ -410,6 +411,15 @@ impl StatementVisitor<Result<Value, RuntimeError>> for Interpreter {
         } else {
             Ok(Value::Nil)
         }
+    }
+    fn visit_while(
+        &mut self,
+        statement: &WhileStatement,
+    ) -> Result<Value, RuntimeError> {
+        while self.evaluate(&statement.condition)?.is_truthy() {
+            self.execute(&statement.body)?;
+        }
+        Ok(Value::Nil)
     }
 }
 

@@ -20,12 +20,13 @@ use crate::{
 // grammar
 // program   -> statement* EOF
 // declaration -> variableDeclaration | statement
-// statement -> exprStmt | printStmt | blockStmt | ifStmt
+// statement -> exprStmt | printStmt | blockStmt | ifStmt | whileStmt
 // exprStmt  -> expression ";"
 // printStmt -> "print" expression ";"
 // variableDeclaration -> "var" IDENTIFIER ( "=" expression )? ";"
 // blockStmt -> "{" declaration* "}"
-// ifStmt -> if "(" expression ")" statement ( "else" statement )?
+// ifStmt -> "if" "(" expression ")" statement ( "else" statement )?
+// whileStmt -> "while" "(" expression ")" statement
 #[derive(Debug, Display)]
 pub enum Statement {
     #[strum(to_string = "Expression({0:?})")]
@@ -37,6 +38,7 @@ pub enum Statement {
     #[strum(to_string = "Block({0:?})")]
     Block(BlockStatement),
     If(IfStatement),
+    While(WhileStatement),
 }
 
 pub trait StatementVisitor<R> {
@@ -51,6 +53,7 @@ pub trait StatementVisitor<R> {
     ) -> R;
     fn visit_block(&mut self, statement: &BlockStatement) -> R;
     fn visit_if(&mut self, statement: &IfStatement) -> R;
+    fn visit_while(&mut self, statement: &WhileStatement) -> R;
 }
 
 impl Statement {
@@ -63,6 +66,7 @@ impl Statement {
             }
             Statement::Block(s) => visitor.visit_block(s),
             Statement::If(s) => visitor.visit_if(s),
+            Statement::While(s) => visitor.visit_while(s),
         }
     }
 }
@@ -122,7 +126,7 @@ impl BlockStatement {
     }
 }
 
-// ifStmt -> if "(" expression ")" statement ( "else" statement )?
+// ifStmt -> "if" "(" expression ")" statement ( "else" statement )?
 #[derive(Debug)]
 pub struct IfStatement {
     pub condition: Expression,
@@ -140,6 +144,22 @@ impl IfStatement {
             condition,
             then_branch: Box::new(then_branch),
             else_branch: else_branch.map(|b| Box::new(b)),
+        })
+    }
+}
+
+// whileStmt -> "while" "(" expression ")" statement
+#[derive(Debug)]
+pub struct WhileStatement {
+    pub condition: Expression,
+    pub body: Box<Statement>,
+}
+
+impl WhileStatement {
+    pub fn new(condition: Expression, body: Statement) -> Statement {
+        Statement::While(Self {
+            condition,
+            body: Box::new(body),
         })
     }
 }

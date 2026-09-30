@@ -9,7 +9,7 @@ use crate::{
     },
     statement::{
         BlockStatement, ExpressionStatement, IfStatement, PrintStatement,
-        Statement, VariableDeclarationStatement,
+        Statement, VariableDeclarationStatement, WhileStatement,
     },
     token::Token,
 };
@@ -17,12 +17,13 @@ use crate::{
 // grammar
 // program   -> statement* EOF
 // declaration -> variableDeclaration | statement
-// statement -> exprStmt | printStmt | blockStmt | ifStmt
+// statement -> exprStmt | printStmt | blockStmt | ifStmt | whileStmt
 // exprStmt  -> expression ";"
 // printStmt -> "print" expression ";"
 // variableDeclaration -> "var" IDENTIFIER ( "=" expression )? ";"
 // blockStmt -> "{" declaration* "}"
-// ifStmt -> if "(" expression ")" statement ( "else" statement )?
+// ifStmt -> "if" "(" expression ")" statement ( "else" statement )?
+// whileStmt -> "while" "(" expression ")" statement
 pub(super) fn parse(
     tokens: &Vec<Token>,
 ) -> Result<Vec<Statement>, LanguageError> {
@@ -98,6 +99,7 @@ fn statement(
         Some(Token::Print) => print_statement(tokens),
         Some(Token::LeftBrace) => block_statement(tokens),
         Some(Token::If) => if_statement(tokens),
+        Some(Token::While) => while_statement(tokens),
         _ => expression_statement(tokens),
     }
 }
@@ -206,13 +208,13 @@ fn if_statement(
     assert_matches!(tokens.next(), Some(Token::If));
 
     if !matches!(tokens.next(), Some(Token::LeftParen)) {
-        return Err(ParseError::MalformedIfStatement(
+        return Err(ParseError::MalformedControlStatement(
             "no left parenthesis after if keyword".to_owned(),
         ));
     }
     let condition = expression(tokens)?;
     if !matches!(tokens.next(), Some(Token::RightParen)) {
-        return Err(ParseError::MalformedIfStatement(
+        return Err(ParseError::MalformedControlStatement(
             "no right parenthesis after if keyword".to_owned(),
         ));
     }
@@ -223,6 +225,28 @@ fn if_statement(
         else_branch = Some(statement(tokens)?);
     }
     Ok(IfStatement::new(condition, then_branch, else_branch))
+}
+
+// whileStmt -> "while" "(" expression ")" statement
+fn while_statement(
+    tokens: &mut Peekable<Iter<Token>>,
+) -> Result<Statement, ParseError> {
+    // have to be while otherwise function should not be called
+    assert_matches!(tokens.next(), Some(Token::While));
+
+    if !matches!(tokens.next(), Some(Token::LeftParen)) {
+        return Err(ParseError::MalformedControlStatement(
+            "no left parenthesis after while keyword".to_owned(),
+        ));
+    }
+    let condition = expression(tokens)?;
+    if !matches!(tokens.next(), Some(Token::RightParen)) {
+        return Err(ParseError::MalformedControlStatement(
+            "no right parenthesis after while keyword".to_owned(),
+        ));
+    }
+    let body = statement(tokens)?;
+    Ok(WhileStatement::new(condition, body))
 }
 
 // grammar

@@ -42,8 +42,8 @@ pub enum ParseError {
     InvalidAssignment(Expression),
     #[error("unknown error on token {0}")]
     Unknown(Token),
-    #[error("malformed if statement: {0}")]
-    MalformedIfStatement(String),
+    #[error("malformed control statement: {0}")]
+    MalformedControlStatement(String),
 }
 
 #[derive(Error, Debug)]
