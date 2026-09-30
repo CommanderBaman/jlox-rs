@@ -11,7 +11,8 @@ use crate::{
     expression::{
         AssignmentExpression, BinaryExpression, BinaryOperator, Expression,
         ExpressionVisitor, GroupingExpression, LiteralExpression, LiteralToken,
-        UnaryExpression, UnaryOperator, VariableExpression,
+        LogicalExpression, LogicalOperator, UnaryExpression, UnaryOperator,
+        VariableExpression,
     },
     statement::{
         BlockStatement, ExpressionStatement, IfStatement, PrintStatement,
@@ -329,6 +330,25 @@ impl ExpressionVisitor<Result<Value, RuntimeError>> for Interpreter {
         self.environment
             .assign(&expression.variable, value.clone())?;
         Ok(value)
+    }
+    fn visit_logical(
+        &mut self,
+        expression: &LogicalExpression,
+    ) -> Result<Value, RuntimeError> {
+        let left_value = self.evaluate(&expression.left_expression)?;
+        match expression.operator {
+            LogicalOperator::Or => {
+                if left_value.is_truthy() {
+                    return Ok(left_value);
+                }
+            }
+            LogicalOperator::And => {
+                if !left_value.is_truthy() {
+                    return Ok(left_value);
+                }
+            }
+        }
+        self.evaluate(&expression.right_expression)
     }
 }
 

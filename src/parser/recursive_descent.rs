@@ -4,7 +4,8 @@ use crate::{
     error::{LanguageError, ParseError},
     expression::{
         AssignmentExpression, BinaryExpression, Expression, GroupingExpression,
-        LiteralExpression, UnaryExpression, VariableExpression,
+        LiteralExpression, LogicalExpression, UnaryExpression,
+        VariableExpression,
     },
     statement::{
         BlockStatement, ExpressionStatement, IfStatement, PrintStatement,
@@ -226,7 +227,9 @@ fn if_statement(
 
 // grammar
 // expression -> assignment
-// assignment -> IDENTIFIER "=" assignment | equality
+// assignment -> IDENTIFIER "=" assignment | logic_or
+// logic_or   -> logic_and ( "or" logic_and )*
+// logic_and  -> equality ( "and" equality )*
 // equality   -> comparison ( ( "!=" | "==" ) comparison )*
 // comparison -> term ( ( ">" | ">=" | "<" | "<=" ) term )*
 // term       -> factor ( ( "-" | "+" ) factor )*
@@ -284,11 +287,11 @@ fn expression(
     assignment(tokens)
 }
 
-// assignment -> IDENTIFIER "=" assignment | equality
+// assignment -> IDENTIFIER "=" assignment | logic_or
 fn assignment(
     tokens: &mut Peekable<Iter<Token>>,
 ) -> Result<Expression, ParseError> {
-    let expr = equality(tokens)?;
+    let expr = logic_or(tokens)?;
     if matches!(tokens.peek(), Some(Token::Equal)) {
         let token = tokens.next();
         assert_matches!(token, Some(Token::Equal));
@@ -300,6 +303,60 @@ fn assignment(
             }
             _ => {
                 return Err(ParseError::InvalidAssignment(expr));
+            }
+        }
+    }
+    Ok(expr)
+}
+
+// logic_or -> logic_and ( "or" logic_and )*
+fn logic_or(
+    tokens: &mut Peekable<Iter<Token>>,
+) -> Result<Expression, ParseError> {
+    let mut expr = logic_and(tokens)?;
+    while let Some(token) = tokens.peek() {
+        match token {
+            Token::Or => {
+                let token = tokens.next();
+                assert_matches!(token, Some(Token::Or));
+                let left_expression = expr;
+                let token = token.unwrap();
+                let right_expression = logic_and(tokens)?;
+                expr = incorrect_token_error_wrap(LogicalExpression::new(
+                    left_expression,
+                    token.to_owned(),
+                    right_expression,
+                ))?;
+            }
+            _ => {
+                break;
+            }
+        }
+    }
+    Ok(expr)
+}
+
+// logic_and -> equality ( "and" equality )*
+fn logic_and(
+    tokens: &mut Peekable<Iter<Token>>,
+) -> Result<Expression, ParseError> {
+    let mut expr = equality(tokens)?;
+    while let Some(token) = tokens.peek() {
+        match token {
+            Token::And => {
+                let token = tokens.next();
+                assert_matches!(token, Some(Token::And));
+                let left_expression = expr;
+                let token = token.unwrap();
+                let right_expression = equality(tokens)?;
+                expr = incorrect_token_error_wrap(LogicalExpression::new(
+                    left_expression,
+                    token.to_owned(),
+                    right_expression,
+                ))?;
+            }
+            _ => {
+                break;
             }
         }
     }

@@ -4,10 +4,8 @@ use strum::Display;
 pub mod print;
 
 // Grammar
-// expression     → literal
-//                | unary
-//                | binary
-//                | grouping ;
+// expression -> literal | unary | binary | grouping
+//              | variable | assignment | logical
 #[derive(Clone, Debug, Display)]
 pub enum Expression {
     #[strum(to_string = "LiteralExpr({0})")]
@@ -18,6 +16,7 @@ pub enum Expression {
     Binary(BinaryExpression),
     Variable(VariableExpression),
     Assignment(AssignmentExpression),
+    Logical(LogicalExpression),
 }
 
 // NOTE: we require mutable expression where ever we might need to evaluate
@@ -29,6 +28,7 @@ pub trait ExpressionVisitor<R> {
     fn visit_binary(&mut self, expression: &BinaryExpression) -> R;
     fn visit_variable(&self, expression: &VariableExpression) -> R;
     fn visit_assignment(&mut self, expression: &AssignmentExpression) -> R;
+    fn visit_logical(&mut self, expression: &LogicalExpression) -> R;
 }
 
 impl Expression {
@@ -40,6 +40,7 @@ impl Expression {
             Expression::Binary(l) => visitor.visit_binary(l),
             Expression::Variable(l) => visitor.visit_variable(l),
             Expression::Assignment(l) => visitor.visit_assignment(l),
+            Expression::Logical(l) => visitor.visit_logical(l),
         }
     }
 }
@@ -208,6 +209,61 @@ impl BinaryExpression {
 }
 
 impl std::fmt::Display for BinaryExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} {} {}",
+            self.left_expression.to_string(),
+            self.operator,
+            self.right_expression.to_string()
+        )
+    }
+}
+// binary -> expression operator expression
+// operator -> "and" | "or"
+#[derive(Clone, Debug, Display)]
+pub enum LogicalOperator {
+    And,
+    Or,
+}
+impl TryFrom<Token> for LogicalOperator {
+    type Error = LanguageError;
+    fn try_from(token: Token) -> Result<Self, Self::Error> {
+        match token {
+            Token::And => Ok(LogicalOperator::And),
+            Token::Or => Ok(LogicalOperator::Or),
+            _ => Err(LanguageError::IncorrectTokenConversion {
+                base_token: token,
+                converted_to: "LogicalOperator",
+            }),
+        }
+    }
+}
+#[derive(Clone, Debug)]
+pub struct LogicalExpression {
+    pub left_expression: Box<Expression>,
+    pub operator: LogicalOperator,
+    pub right_expression: Box<Expression>,
+}
+impl LogicalExpression {
+    pub fn wrap(self) -> Expression {
+        Expression::Logical(self)
+    }
+    pub fn new(
+        left_expression: Expression,
+        token: Token,
+        right_expression: Expression,
+    ) -> Result<Expression, LanguageError> {
+        let operator = token.try_into()?;
+        Ok(Expression::Logical(Self {
+            left_expression: Box::new(left_expression),
+            operator,
+            right_expression: Box::new(right_expression),
+        }))
+    }
+}
+
+impl std::fmt::Display for LogicalExpression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
