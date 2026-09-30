@@ -30,11 +30,13 @@ pub enum Value {
     Number(f64),
     #[strum(to_string = "{0}")]
     String(String),
+    #[strum(to_string = "uninitialized")]
+    Unintialized,
 }
 
 impl Value {
     fn is_truthy(&self) -> bool {
-        !matches!(self, Value::Nil | Value::Bool(false))
+        !matches!(self, Value::Unintialized | Value::Nil | Value::Bool(false))
     }
 }
 
@@ -64,26 +66,30 @@ impl Ord for Value {
     }
 }
 
-impl From<Value> for LiteralExpression {
-    fn from(value: Value) -> Self {
+impl TryFrom<Value> for LiteralExpression {
+    type Error = RuntimeError;
+    fn try_from(value: Value) -> Result<Self, RuntimeError> {
         match value {
-            Value::String(s) => LiteralExpression {
+            Value::String(s) => Ok(LiteralExpression {
                 literal: LiteralToken::String(s),
-            },
+            }),
             Value::Bool(b) => {
                 let literal = if b {
                     LiteralToken::True
                 } else {
                     LiteralToken::False
                 };
-                LiteralExpression { literal }
+                Ok(LiteralExpression { literal })
             }
-            Value::Number(n) => LiteralExpression {
+            Value::Number(n) => Ok(LiteralExpression {
                 literal: LiteralToken::Number(n),
-            },
-            Value::Nil => LiteralExpression {
+            }),
+            Value::Nil => Ok(LiteralExpression {
                 literal: LiteralToken::Nil,
-            },
+            }),
+            Value::Unintialized => {
+                Err(RuntimeError::UnitializedVariableUsed("?".to_owned()))
+            }
         }
     }
 }
@@ -94,9 +100,9 @@ fn get_binary_expression(
     operator: Token,
 ) -> Expression {
     BinaryExpression::new(
-        Expression::Literal(left.into()),
+        Expression::Literal(left.try_into().expect("left value to be initialized")),
         operator,
-        Expression::Literal(right.into()),
+        Expression::Literal(right.try_into().expect("right value to be initialized")),
     )
     .expect("value to literal conversion failed or invalid operator passed for building binary expression for error")
 }
@@ -117,6 +123,9 @@ impl Add for Value {
             (Value::Number(l), Value::String(r)) => {
                 Ok(Value::String(format!("{l}{r}")))
             }
+            (Value::Unintialized, _) | (_, Value::Unintialized) => {
+                Err(RuntimeError::UnitializedVariableUsed("?".to_owned()))
+            }
             _ => Err(RuntimeError::InvalidOperation {
                 operation: "Add".to_owned(),
                 expression: get_binary_expression(self, rhs, Token::Plus),
@@ -130,6 +139,9 @@ impl Sub for Value {
     fn sub(self, rhs: Self) -> Self::Output {
         match (&self, &rhs) {
             (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l - r)),
+            (Value::Unintialized, _) | (_, Value::Unintialized) => {
+                Err(RuntimeError::UnitializedVariableUsed("?".to_owned()))
+            }
             _ => Err(RuntimeError::InvalidOperation {
                 operation: "Sub".to_owned(),
                 expression: get_binary_expression(self, rhs, Token::Minus),
@@ -143,6 +155,9 @@ impl Mul for Value {
     fn mul(self, rhs: Self) -> Self::Output {
         match (&self, &rhs) {
             (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l * r)),
+            (Value::Unintialized, _) | (_, Value::Unintialized) => {
+                Err(RuntimeError::UnitializedVariableUsed("?".to_owned()))
+            }
             _ => Err(RuntimeError::InvalidOperation {
                 operation: "Mul".to_owned(),
                 expression: get_binary_expression(self, rhs, Token::Star),
@@ -167,6 +182,9 @@ impl Div for Value {
                     ));
                 }
                 Ok(Value::Number(l / r))
+            }
+            (Value::Unintialized, _) | (_, Value::Unintialized) => {
+                Err(RuntimeError::UnitializedVariableUsed("?".to_owned()))
             }
             _ => Err(RuntimeError::InvalidOperation {
                 operation: "Div".to_owned(),
@@ -338,7 +356,7 @@ impl StatementVisitor<Result<Value, RuntimeError>> for Interpreter {
             .as_ref()
             .map(|ex| self.evaluate(ex))
             .transpose()?
-            .unwrap_or(Value::Nil);
+            .unwrap_or(Value::Unintialized);
         self.environment
             .define(statement.name.clone(), value.clone());
         Ok(value)

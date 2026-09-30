@@ -17,6 +17,8 @@ pub enum RuntimeError {
     VariableNotFound(String),
     #[error("code tried to remove root environment")]
     RootEnvironmentRemoved,
+    #[error("variable {0} used without initializing")]
+    UnitializedVariableUsed(String),
 }
 
 #[derive(Error, Debug)]
