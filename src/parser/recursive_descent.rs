@@ -17,13 +17,15 @@ use crate::{
 // grammar
 // program   -> statement* EOF
 // declaration -> variableDeclaration | statement
-// statement -> exprStmt | printStmt | blockStmt | ifStmt | whileStmt
+// statement -> exprStmt | printStmt | blockStmt | ifStmt | whileStmt | forStmt
 // exprStmt  -> expression ";"
 // printStmt -> "print" expression ";"
 // variableDeclaration -> "var" IDENTIFIER ( "=" expression )? ";"
 // blockStmt -> "{" declaration* "}"
 // ifStmt -> "if" "(" expression ")" statement ( "else" statement )?
 // whileStmt -> "while" "(" expression ")" statement
+// forStmt -> "for" "(" varDecl | exprStmt | ";" )
+//              expression? ";" expression? ")" statement
 pub(super) fn parse(
     tokens: &Vec<Token>,
 ) -> Result<Vec<Statement>, LanguageError> {
@@ -89,6 +91,7 @@ fn declaration(
 //
 // I wanted to extract out the ";" logic into this
 // but that went sideways due to introduction of block, if, etc.
+// also our grammar specifies ";" logic into those definitions
 fn statement(
     tokens: &mut Peekable<Iter<Token>>,
 ) -> Result<Statement, ParseError> {
@@ -100,6 +103,7 @@ fn statement(
         Some(Token::LeftBrace) => block_statement(tokens),
         Some(Token::If) => if_statement(tokens),
         Some(Token::While) => while_statement(tokens),
+        Some(Token::For) => for_statement(tokens),
         _ => expression_statement(tokens),
     }
 }
@@ -247,6 +251,79 @@ fn while_statement(
     }
     let body = statement(tokens)?;
     Ok(WhileStatement::new(condition, body))
+}
+
+// forStmt -> "for" "(" varDecl | exprStmt | ";" )
+//              expression? ";" expression? ")" statement
+fn for_statement(
+    tokens: &mut Peekable<Iter<Token>>,
+) -> Result<Statement, ParseError> {
+    // have to be for otherwise function should not be called
+    assert_matches!(tokens.next(), Some(Token::For));
+
+    if !matches!(tokens.next(), Some(Token::LeftParen)) {
+        return Err(ParseError::MalformedControlStatement(
+            "no left parenthesis after for keyword".to_owned(),
+        ));
+    }
+
+    let mut initializer = None;
+    match tokens.peek() {
+        Some(Token::Semicolon) => {
+            assert_matches!(tokens.next(), Some(Token::Semicolon));
+        }
+        Some(Token::Var) => {
+            initializer = Some(variable_declaration_statement(tokens)?);
+        }
+        _ => {
+            initializer = Some(expression_statement(tokens)?);
+        }
+    }
+
+    let mut condition = None;
+    if !matches!(tokens.peek(), Some(Token::Semicolon)) {
+        condition = Some(expression(tokens)?);
+    }
+    if !matches!(tokens.next(), Some(Token::Semicolon)) {
+        return Err(ParseError::MalformedControlStatement(
+            "no ; after condition in for loop".to_owned(),
+        ));
+    }
+    let mut increment = None;
+    if !matches!(tokens.peek(), Some(Token::RightParen)) {
+        increment = Some(expression(tokens)?);
+    }
+    if !matches!(tokens.next(), Some(Token::RightParen)) {
+        return Err(ParseError::MalformedControlStatement(
+            "no right parenthesis after for keyword".to_owned(),
+        ));
+    }
+    let mut body = statement(tokens)?;
+
+    // converting into a while statement
+    // {
+    //   initializer
+    //   while (condition) {
+    //     body
+    //     increment
+    //   }
+    // }
+    if let Some(increment) = increment {
+        body =
+            BlockStatement::new(vec![body, ExpressionStatement::new(increment)])
+    }
+    // WARN: this means if we do not use the break keyword, this loop will
+    // go till infinity? That is a problem, a BIG problem
+    let condition = condition.unwrap_or(incorrect_token_error_wrap(
+        LiteralExpression::new(Token::True),
+    )?);
+    body = WhileStatement::new(condition, body);
+
+    if let Some(initializer) = initializer {
+        body = BlockStatement::new(vec![initializer, body]);
+    }
+
+    Ok(body)
 }
 
 // grammar

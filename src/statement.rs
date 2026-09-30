@@ -20,13 +20,17 @@ use crate::{
 // grammar
 // program   -> statement* EOF
 // declaration -> variableDeclaration | statement
-// statement -> exprStmt | printStmt | blockStmt | ifStmt | whileStmt
+// statement -> exprStmt | printStmt | blockStmt | ifStmt | whileStmt | forStmt
 // exprStmt  -> expression ";"
 // printStmt -> "print" expression ";"
 // variableDeclaration -> "var" IDENTIFIER ( "=" expression )? ";"
 // blockStmt -> "{" declaration* "}"
 // ifStmt -> "if" "(" expression ")" statement ( "else" statement )?
 // whileStmt -> "while" "(" expression ")" statement
+// forStmt -> "for" "(" varDecl | exprStmt | ";" )
+//              expression? ";" expression? ")" statement
+//
+// NOTE: forStmt is syntactic sugar for whileStmt
 #[derive(Debug, Display)]
 pub enum Statement {
     #[strum(to_string = "Expression({0:?})")]
