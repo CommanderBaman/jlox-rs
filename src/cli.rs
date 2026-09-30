@@ -5,7 +5,7 @@ use crate::{
 use std::{
     env,
     fs::File,
-    io::{self, BufRead, BufReader, Write},
+    io::{self, BufReader, Read, Write},
     path::{Path, PathBuf},
 };
 
@@ -39,24 +39,24 @@ fn run_file(path: &Path) -> Result<(), CliError> {
     }
     println!("running file at {path:?}");
     let file = File::open(path)?;
-    let reader = BufReader::new(file);
+    let mut reader = BufReader::new(file);
 
     let mut program = Lox::new();
-    let mut count = 1;
-    for line in reader.lines() {
-        let line = line?;
-        program.run(&line, &count).map_err(|e| match e {
-            LanguageError::Runtime(r) => CliError::Runtime {
-                line: count,
-                error: r,
-            },
-            _ => CliError::Language {
-                line: count,
-                error: e,
-            },
-        })?;
-        count += 1;
-    }
+    let line_count = 1;
+
+    let mut lines = String::new();
+    reader.read_to_string(&mut lines)?;
+
+    program.run(&lines, &line_count).map_err(|e| match e {
+        LanguageError::Runtime(r) => CliError::Runtime {
+            line: line_count,
+            error: r,
+        },
+        _ => CliError::Language {
+            line: line_count,
+            error: e,
+        },
+    })?;
     Ok(())
 }
 
