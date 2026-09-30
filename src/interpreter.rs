@@ -14,8 +14,8 @@ use crate::{
         UnaryExpression, UnaryOperator, VariableExpression,
     },
     statement::{
-        BlockStatement, ExpressionStatement, PrintStatement, Statement,
-        StatementVisitor, VariableDeclarationStatement,
+        BlockStatement, ExpressionStatement, IfStatement, PrintStatement,
+        Statement, StatementVisitor, VariableDeclarationStatement,
     },
     token::Token,
 };
@@ -378,6 +378,18 @@ impl StatementVisitor<Result<Value, RuntimeError>> for Interpreter {
         }
         self.environment.pop_child()?;
         Ok(Value::Nil)
+    }
+    fn visit_if(
+        &mut self,
+        statement: &IfStatement,
+    ) -> Result<Value, RuntimeError> {
+        if self.evaluate(&statement.condition)?.is_truthy() {
+            self.execute(&statement.then_branch)
+        } else if let Some(ref else_branch) = statement.else_branch {
+            self.execute(else_branch)
+        } else {
+            Ok(Value::Nil)
+        }
     }
 }
 

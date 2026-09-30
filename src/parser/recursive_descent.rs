@@ -7,19 +7,21 @@ use crate::{
         LiteralExpression, UnaryExpression, VariableExpression,
     },
     statement::{
-        BlockStatement, ExpressionStatement, PrintStatement, Statement,
-        VariableDeclarationStatement,
+        BlockStatement, ExpressionStatement, IfStatement, PrintStatement,
+        Statement, VariableDeclarationStatement,
     },
     token::Token,
 };
 
 // grammar
 // program   -> statement* EOF
-// statement -> variableDeclaration | exprStmt | printStmt | blockStmt
+// declaration -> variableDeclaration | statement
+// statement -> exprStmt | printStmt | blockStmt | ifStmt
 // exprStmt  -> expression ";"
 // printStmt -> "print" expression ";"
 // variableDeclaration -> "var" IDENTIFIER ( "=" expression )? ";"
-// blockStmt -> "{" statement* "}"
+// blockStmt -> "{" declaration* "}"
+// ifStmt -> if "(" expression ")" statement ( "else" statement )?
 pub(super) fn parse(
     tokens: &Vec<Token>,
 ) -> Result<Vec<Statement>, LanguageError> {
@@ -27,7 +29,7 @@ pub(super) fn parse(
     let mut statements = Vec::new();
     let mut errors = Vec::new();
     while tokens.peek().is_some() {
-        match statement(&mut tokens) {
+        match declaration(&mut tokens) {
             Ok(s) => statements.push(s),
             Err(err) => {
                 errors.push(err);
@@ -71,8 +73,20 @@ pub(super) fn parse(
     }
 }
 
-// TODO: it might be better to extract out the ";" logic into this
-// but I don't know what other statements are there so leaving it
+// declaration -> variableDeclaration | statement
+fn declaration(
+    tokens: &mut Peekable<Iter<Token>>,
+) -> Result<Statement, ParseError> {
+    match tokens.peek() {
+        Some(Token::Var) => variable_declaration_statement(tokens),
+        _ => statement(tokens),
+    }
+}
+
+// statement -> exprStmt | printStmt | blockStmt | ifStmt
+//
+// I wanted to extract out the ";" logic into this
+// but that went sideways due to introduction of block, if, etc.
 fn statement(
     tokens: &mut Peekable<Iter<Token>>,
 ) -> Result<Statement, ParseError> {
@@ -81,8 +95,8 @@ fn statement(
         // ensures that it breaks on a none
         None => unreachable!(),
         Some(Token::Print) => print_statement(tokens),
-        Some(Token::Var) => variable_declaration_statement(tokens),
         Some(Token::LeftBrace) => block_statement(tokens),
+        Some(Token::If) => if_statement(tokens),
         _ => expression_statement(tokens),
     }
 }
@@ -153,7 +167,7 @@ fn variable_declaration_statement(
     ))
 }
 
-// blockStmt -> "{" statement* "}"
+// blockStmt -> "{" declaration* "}"
 fn block_statement(
     tokens: &mut Peekable<Iter<Token>>,
 ) -> Result<Statement, ParseError> {
@@ -168,7 +182,7 @@ fn block_statement(
                 return Ok(BlockStatement::new(statements));
             }
             _ => {
-                statements.push(statement(tokens)?);
+                statements.push(declaration(tokens)?);
             }
         }
     }
@@ -181,6 +195,33 @@ fn block_statement(
         "{{ {}",
         statements_string
     )))
+}
+
+// ifStmt -> if "(" expression ")" statement ( "else" statement )?
+fn if_statement(
+    tokens: &mut Peekable<Iter<Token>>,
+) -> Result<Statement, ParseError> {
+    // have to be if otherwise function should not be called
+    assert_matches!(tokens.next(), Some(Token::If));
+
+    if !matches!(tokens.next(), Some(Token::LeftParen)) {
+        return Err(ParseError::MalformedIfStatement(
+            "no left parenthesis after if keyword".to_owned(),
+        ));
+    }
+    let condition = expression(tokens)?;
+    if !matches!(tokens.next(), Some(Token::RightParen)) {
+        return Err(ParseError::MalformedIfStatement(
+            "no right parenthesis after if keyword".to_owned(),
+        ));
+    }
+    let then_branch = statement(tokens)?;
+    let mut else_branch = None;
+    if matches!(tokens.peek(), Some(Token::Else)) {
+        _ = tokens.next();
+        else_branch = Some(statement(tokens)?);
+    }
+    Ok(IfStatement::new(condition, then_branch, else_branch))
 }
 
 // grammar

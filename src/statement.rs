@@ -8,18 +8,24 @@ use crate::{
     token::Token,
 };
 
-// NOTE: diverged a bit from the grammar notation
+// NOTE: I diverged a bit from the grammar notation
 // everything else remains same
 // I merged declaration into statement
-//
+// Later, I found it is wrong because of the case:
+// if (<condition>) var a = 2;
+// here we can not know where to define a: is it if scope or parent
+// I am dumb sometimes
+// I will keep the Statement enum as is
 //
 // grammar
 // program   -> statement* EOF
-// statement -> variableDeclaration | exprStmt | printStmt | blockStmt
+// declaration -> variableDeclaration | statement
+// statement -> exprStmt | printStmt | blockStmt | ifStmt
 // exprStmt  -> expression ";"
 // printStmt -> "print" expression ";"
 // variableDeclaration -> "var" IDENTIFIER ( "=" expression )? ";"
-// blockStmt -> "{" statement* "}"
+// blockStmt -> "{" declaration* "}"
+// ifStmt -> if "(" expression ")" statement ( "else" statement )?
 #[derive(Debug, Display)]
 pub enum Statement {
     #[strum(to_string = "Expression({0:?})")]
@@ -30,6 +36,7 @@ pub enum Statement {
     VariableDeclaration(VariableDeclarationStatement),
     #[strum(to_string = "Block({0:?})")]
     Block(BlockStatement),
+    If(IfStatement),
 }
 
 pub trait StatementVisitor<R> {
@@ -43,6 +50,7 @@ pub trait StatementVisitor<R> {
         statement: &VariableDeclarationStatement,
     ) -> R;
     fn visit_block(&mut self, statement: &BlockStatement) -> R;
+    fn visit_if(&mut self, statement: &IfStatement) -> R;
 }
 
 impl Statement {
@@ -54,6 +62,7 @@ impl Statement {
                 visitor.visit_variable_declaration(s)
             }
             Statement::Block(s) => visitor.visit_block(s),
+            Statement::If(s) => visitor.visit_if(s),
         }
     }
 }
@@ -101,7 +110,7 @@ impl VariableDeclarationStatement {
     }
 }
 
-// block
+// blockStmt -> "{" statement* "}"
 #[derive(Debug)]
 pub struct BlockStatement {
     pub statements: Vec<Statement>,
@@ -110,5 +119,27 @@ pub struct BlockStatement {
 impl BlockStatement {
     pub fn new(statements: Vec<Statement>) -> Statement {
         Statement::Block(Self { statements })
+    }
+}
+
+// ifStmt -> if "(" expression ")" statement ( "else" statement )?
+#[derive(Debug)]
+pub struct IfStatement {
+    pub condition: Expression,
+    pub then_branch: Box<Statement>,
+    pub else_branch: Option<Box<Statement>>,
+}
+
+impl IfStatement {
+    pub fn new(
+        condition: Expression,
+        then_branch: Statement,
+        else_branch: Option<Statement>,
+    ) -> Statement {
+        Statement::If(Self {
+            condition,
+            then_branch: Box::new(then_branch),
+            else_branch: else_branch.map(|b| Box::new(b)),
+        })
     }
 }
