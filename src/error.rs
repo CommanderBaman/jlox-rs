@@ -2,7 +2,7 @@ use std::{fmt::Debug, process::ExitCode};
 
 use thiserror::Error;
 
-use crate::{expression::Expression, token::Token};
+use crate::{expression::Expression, statement::Statement, token::Token};
 
 #[derive(Error, Debug)]
 pub enum RuntimeError {
@@ -19,6 +19,12 @@ pub enum RuntimeError {
     RootEnvironmentRemoved,
     #[error("variable {0} used without initializing")]
     UnitializedVariableUsed(String),
+    #[error("value is not callable: {0}")]
+    NotCallable(String),
+    #[error(
+        "incorrect number of arguments received for {0}. Expected {1}, Received {2}"
+    )]
+    IncorrectNumberOfArguments(String, usize, usize),
 }
 
 #[derive(Error, Debug)]
@@ -29,6 +35,11 @@ pub enum ParseError {
     WrongTokenForExpression {
         expression_type: &'static str,
         token: Token,
+    },
+    #[error("wrong statement for {statement_type} statement via {statement}")]
+    WrongStatementForConversion {
+        statement_type: &'static str,
+        statement: Statement,
     },
     #[error("statement does not end with semi colon: {0}")]
     UnterminatedStatement(String),
@@ -44,6 +55,12 @@ pub enum ParseError {
     Unknown(Token),
     #[error("malformed control statement: {0}")]
     MalformedControlStatement(String),
+    #[error("call expression does not end: {0}")]
+    UnterminatedCall(String),
+    #[error("too many arguments given in function call")]
+    TooManyArguments,
+    #[error("malformed function declaration: {0}")]
+    MalformedFunctionDeclaration(String),
 }
 
 #[derive(Error, Debug)]
@@ -61,6 +78,13 @@ pub enum LanguageError {
     )]
     IncorrectTokenConversion {
         base_token: Token,
+        converted_to: &'static str,
+    },
+    #[error(
+        "the given statement {base_statement} was incorrectly converted to {converted_to}"
+    )]
+    IncorrectStatementConversion {
+        base_statement: Statement,
         converted_to: &'static str,
     },
     #[error("parse errors:\n{}", .0.iter().fold(String::new(), |acc, e| format!("{acc}\n* {e}")).split_off(1))]

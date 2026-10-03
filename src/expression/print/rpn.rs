@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 
 use crate::expression::{
-    AssignmentExpression, Expression, ExpressionVisitor, LogicalExpression,
-    VariableExpression,
+    AssignmentExpression, CallExpression, Expression, ExpressionVisitor,
+    LogicalExpression, VariableExpression,
 };
 
 pub struct RpnPrinter {}
@@ -60,6 +60,9 @@ impl ExpressionVisitor<String> for RpnPrinter {
         unimplemented!()
     }
     fn visit_logical(&mut self, _expression: &LogicalExpression) -> String {
+        unimplemented!()
+    }
+    fn visit_call(&mut self, _expression: &CallExpression) -> String {
         unimplemented!()
     }
 }

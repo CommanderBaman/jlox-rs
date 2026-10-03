@@ -9,15 +9,15 @@ use crate::{
     environment::Environment,
     error::RuntimeError,
     expression::{
-        AssignmentExpression, BinaryExpression, BinaryOperator, Expression,
-        ExpressionVisitor, GroupingExpression, LiteralExpression, LiteralToken,
-        LogicalExpression, LogicalOperator, UnaryExpression, UnaryOperator,
-        VariableExpression,
+        AssignmentExpression, BinaryExpression, BinaryOperator, CallExpression,
+        Expression, ExpressionVisitor, GroupingExpression, LiteralExpression,
+        LiteralToken, LogicalExpression, LogicalOperator, UnaryExpression,
+        UnaryOperator, VariableExpression,
     },
     statement::{
-        BlockStatement, ExpressionStatement, IfStatement, PrintStatement,
-        Statement, StatementVisitor, VariableDeclarationStatement,
-        WhileStatement,
+        BlockStatement, ExpressionStatement, FunctionDeclarationStatement,
+        IfStatement, PrintStatement, Statement, StatementVisitor,
+        VariableDeclarationStatement, WhileStatement,
     },
     token::Token,
 };
@@ -39,6 +39,13 @@ pub enum Value {
 impl Value {
     fn is_truthy(&self) -> bool {
         !matches!(self, Value::Unintialized | Value::Nil | Value::Bool(false))
+    }
+    fn call(
+        &self,
+        _interpreter: &mut Interpreter,
+        _arguments: Vec<Self>,
+    ) -> Result<Self, RuntimeError> {
+        todo!("value call not implemented")
     }
 }
 
@@ -63,7 +70,7 @@ impl Ord for Value {
             // ex, "02" < 1 because "0" < "1"
             // Python also gives us type error when we do int vs str comparison
             (Value::Nil, Value::Nil) => Ordering::Equal,
-            _ => unimplemented!(),
+            _ => todo!("value order not implemented"),
         }
     }
 }
@@ -197,7 +204,7 @@ impl Div for Value {
 }
 
 pub struct Interpreter {
-    environment: Environment,
+    pub environment: Environment,
     print_expression: bool,
 }
 
@@ -351,6 +358,18 @@ impl ExpressionVisitor<Result<Value, RuntimeError>> for Interpreter {
         }
         self.evaluate(&expression.right_expression)
     }
+    fn visit_call(
+        &mut self,
+        expression: &CallExpression,
+    ) -> Result<Value, RuntimeError> {
+        let callee = self.evaluate(&expression.callee)?;
+        let arguments: Vec<Value> = expression
+            .arguments
+            .iter()
+            .map(|arg| self.evaluate(arg))
+            .collect::<Result<Vec<Value>, RuntimeError>>()?;
+        callee.call(self, arguments)
+    }
 }
 
 impl StatementVisitor<Result<Value, RuntimeError>> for Interpreter {
@@ -420,6 +439,12 @@ impl StatementVisitor<Result<Value, RuntimeError>> for Interpreter {
             self.execute(&statement.body)?;
         }
         Ok(Value::Nil)
+    }
+    fn visit_function(
+        &mut self,
+        _statement: &FunctionDeclarationStatement,
+    ) -> Result<Value, RuntimeError> {
+        todo!("function visit not implemented")
     }
 }
 

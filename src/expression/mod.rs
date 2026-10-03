@@ -5,7 +5,7 @@ pub mod print;
 
 // Grammar
 // expression -> literal | unary | binary | grouping
-//              | variable | assignment | logical
+//              | variable | assignment | logical | call
 #[derive(Clone, Debug, Display)]
 pub enum Expression {
     #[strum(to_string = "LiteralExpr({0})")]
@@ -17,6 +17,7 @@ pub enum Expression {
     Variable(VariableExpression),
     Assignment(AssignmentExpression),
     Logical(LogicalExpression),
+    Call(CallExpression),
 }
 
 // NOTE: we require mutable expression where ever we might need to evaluate
@@ -29,6 +30,7 @@ pub trait ExpressionVisitor<R> {
     fn visit_variable(&self, expression: &VariableExpression) -> R;
     fn visit_assignment(&mut self, expression: &AssignmentExpression) -> R;
     fn visit_logical(&mut self, expression: &LogicalExpression) -> R;
+    fn visit_call(&mut self, expression: &CallExpression) -> R;
 }
 
 impl Expression {
@@ -41,6 +43,7 @@ impl Expression {
             Expression::Variable(l) => visitor.visit_variable(l),
             Expression::Assignment(l) => visitor.visit_assignment(l),
             Expression::Logical(l) => visitor.visit_logical(l),
+            Expression::Call(l) => visitor.visit_call(l),
         }
     }
 }
@@ -219,7 +222,7 @@ impl std::fmt::Display for BinaryExpression {
         )
     }
 }
-// binary -> expression operator expression
+// logical -> expression operator expression
 // operator -> "and" | "or"
 #[derive(Clone, Debug, Display)]
 pub enum LogicalOperator {
@@ -276,7 +279,7 @@ impl std::fmt::Display for LogicalExpression {
 }
 
 // variable -> IDENTIFIER
-#[derive(Clone, Debug, Display, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, PartialOrd)]
 pub enum VariableToken {
     #[strum(to_string = "Identifier({0})")]
     Identifer(String),
@@ -339,5 +342,23 @@ impl std::fmt::Display for AssignmentExpression {
             self.variable.to_string(),
             self.expression.to_string()
         )
+    }
+}
+
+// call -> primary ( "(" arguments? ")" )*
+#[derive(Clone, Debug)]
+pub struct CallExpression {
+    pub callee: Box<Expression>,
+    pub arguments: Vec<Expression>,
+}
+impl CallExpression {
+    pub fn wrap(self) -> Expression {
+        Expression::Call(self)
+    }
+    pub fn new(callee: Expression, arguments: Vec<Expression>) -> Expression {
+        Expression::Call(Self {
+            callee: Box::from(callee),
+            arguments,
+        })
     }
 }

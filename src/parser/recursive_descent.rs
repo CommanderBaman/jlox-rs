@@ -3,20 +3,21 @@ use std::{assert_matches, iter::Peekable, slice::Iter};
 use crate::{
     error::{LanguageError, ParseError},
     expression::{
-        AssignmentExpression, BinaryExpression, Expression, GroupingExpression,
-        LiteralExpression, LogicalExpression, UnaryExpression,
-        VariableExpression,
+        AssignmentExpression, BinaryExpression, CallExpression, Expression,
+        GroupingExpression, LiteralExpression, LogicalExpression,
+        UnaryExpression, VariableExpression,
     },
     statement::{
-        BlockStatement, ExpressionStatement, IfStatement, PrintStatement,
-        Statement, VariableDeclarationStatement, WhileStatement,
+        BlockStatement, ExpressionStatement, FunctionDeclarationStatement,
+        IfStatement, PrintStatement, Statement, VariableDeclarationStatement,
+        WhileStatement,
     },
     token::Token,
 };
 
 // grammar
 // program   -> declaration* EOF
-// declaration -> variableDeclaration | statement
+// declaration -> functionDeclaration | variableDeclaration | statement
 // statement -> exprStmt | printStmt | blockStmt | ifStmt | whileStmt | forStmt
 // exprStmt  -> expression ";"
 // printStmt -> "print" expression ";"
@@ -26,6 +27,9 @@ use crate::{
 // whileStmt -> "while" "(" expression ")" statement
 // forStmt -> "for" "(" varDecl | exprStmt | ";" )
 //              expression? ";" expression? ")" statement
+// functionDeclaration -> "fun" function
+// function -> IDENTIFIER "(" parameters? ")" blockStmt
+// parameters -> IDENTIFIER ( "," IDENTIFIER )*
 pub(super) fn parse(
     tokens: &Vec<Token>,
 ) -> Result<Vec<Statement>, LanguageError> {
@@ -83,6 +87,7 @@ fn declaration(
 ) -> Result<Statement, ParseError> {
     match tokens.peek() {
         Some(Token::Var) => variable_declaration_statement(tokens),
+        Some(Token::Fun) => function_declaration_statement(tokens),
         _ => statement(tokens),
     }
 }
@@ -168,10 +173,78 @@ fn variable_declaration_statement(
     }
     _ = tokens.next();
 
-    incorrect_token_error_wrap(VariableDeclarationStatement::new(
+    language_error_wrap(VariableDeclarationStatement::new(
         variable_token.clone(),
         expr,
     ))
+}
+
+// functionDeclaration -> "fun" function
+// function -> IDENTIFIER "(" parameters ")" blockStmt
+// parameters -> (IDENTIFIER ( "," IDENTIFIER )*)?
+//
+// NOTE: in this implementation, I have moved the part of ? inside the parameters
+// This makes it a lot easier and readable for me
+// You can see arguments for the normal implementation
+fn function_declaration_statement(
+    tokens: &mut Peekable<Iter<Token>>,
+) -> Result<Statement, ParseError> {
+    assert_matches!(tokens.next(), Some(Token::Fun));
+    // identifier
+    if !matches!(tokens.peek(), Some(Token::Identifier(_))) {
+        return Err(ParseError::MalformedFunctionDeclaration(
+            "no identifier after fun keyword".to_string(),
+        ));
+    }
+    let name = tokens.next().unwrap();
+    // (
+    if tokens.next_if(|t| matches!(t, Token::LeftParen)).is_none() {
+        return Err(ParseError::MalformedFunctionDeclaration(
+            "no ( after function declaration".to_string(),
+        ));
+    }
+    // parameters
+    let parameters = parameters(tokens)?;
+    // )
+    if tokens.next_if(|t| matches!(t, Token::RightParen)).is_none() {
+        return Err(ParseError::MalformedFunctionDeclaration(
+            "no ) after function declaration".to_string(),
+        ));
+    }
+    // body
+    if !matches!(tokens.peek(), Some(Token::LeftBrace)) {
+        return Err(ParseError::MalformedFunctionDeclaration(
+            "no { after function declaration".to_string(),
+        ));
+    }
+    let body = block_statement(tokens)?;
+    language_error_wrap(FunctionDeclarationStatement::new(
+        name.to_owned(),
+        parameters,
+        body,
+    ))
+}
+
+// parameters -> (IDENTIFIER ( "," IDENTIFIER )*)?
+fn parameters(
+    tokens: &mut Peekable<Iter<Token>>,
+) -> Result<Vec<Token>, ParseError> {
+    let mut params = vec![];
+    if !matches!(tokens.peek(), Some(Token::Identifier(_))) {
+        return Ok(params);
+    }
+    params.push(tokens.next().unwrap().to_owned());
+    while tokens.next_if(|t| matches!(t, Token::Comma)).is_some() {
+        let Some(variable) =
+            tokens.next_if(|t| matches!(t, Token::Identifier(_)))
+        else {
+            return Err(ParseError::MalformedFunctionDeclaration(
+                "no identifier after comma in parameters".to_string(),
+            ));
+        };
+        params.push(variable.to_owned());
+    }
+    Ok(params)
 }
 
 // blockStmt -> "{" declaration* "}"
@@ -314,9 +387,8 @@ fn for_statement(
     }
     // WARN: this means if we do not use the break keyword, this loop will
     // go till infinity? That is a problem, a BIG problem
-    let condition = condition.unwrap_or(incorrect_token_error_wrap(
-        LiteralExpression::new(Token::True),
-    )?);
+    let condition = condition
+        .unwrap_or(language_error_wrap(LiteralExpression::new(Token::True))?);
     body = WhileStatement::new(condition, body);
 
     if let Some(initializer) = initializer {
@@ -335,7 +407,9 @@ fn for_statement(
 // comparison -> term ( ( ">" | ">=" | "<" | "<=" ) term )*
 // term       -> factor ( ( "-" | "+" ) factor )*
 // factor     -> unary ( ( "/" | "*" ) unary )*
-// unary      -> ( "!" | "-" ) unary | primary
+// unary      -> ( "!" | "-" ) unary | call
+// call       -> primary ( "(" arguments? ")" )*
+// arguments  -> expression ( "," expression )*
 // primary    -> NUMBER | STRING | "true" | "false" | "nil"
 //              | "(" expression ")" | IDENTIFIER
 pub(super) fn parse_expression(
@@ -423,7 +497,7 @@ fn logic_or(
                 let left_expression = expr;
                 let token = token.unwrap();
                 let right_expression = logic_and(tokens)?;
-                expr = incorrect_token_error_wrap(LogicalExpression::new(
+                expr = language_error_wrap(LogicalExpression::new(
                     left_expression,
                     token.to_owned(),
                     right_expression,
@@ -450,7 +524,7 @@ fn logic_and(
                 let left_expression = expr;
                 let token = token.unwrap();
                 let right_expression = equality(tokens)?;
-                expr = incorrect_token_error_wrap(LogicalExpression::new(
+                expr = language_error_wrap(LogicalExpression::new(
                     left_expression,
                     token.to_owned(),
                     right_expression,
@@ -477,12 +551,11 @@ fn equality(
                     .next()
                     .expect("no token after peek check - equality");
                 let right_expression = comparison(tokens)?;
-                expression =
-                    incorrect_token_error_wrap(BinaryExpression::new(
-                        left_expression,
-                        operator.to_owned(),
-                        right_expression,
-                    ))?;
+                expression = language_error_wrap(BinaryExpression::new(
+                    left_expression,
+                    operator.to_owned(),
+                    right_expression,
+                ))?;
             }
             _ => break,
         }
@@ -506,12 +579,11 @@ fn comparison(
                     .next()
                     .expect("no token after peek check - comparison");
                 let right_expression = term(tokens)?;
-                expression =
-                    incorrect_token_error_wrap(BinaryExpression::new(
-                        left_expression,
-                        operator.to_owned(),
-                        right_expression,
-                    ))?;
+                expression = language_error_wrap(BinaryExpression::new(
+                    left_expression,
+                    operator.to_owned(),
+                    right_expression,
+                ))?;
             }
             _ => break,
         }
@@ -529,12 +601,11 @@ fn term(tokens: &mut Peekable<Iter<Token>>) -> Result<Expression, ParseError> {
                 let operator =
                     tokens.next().expect("no token after peek check - term");
                 let right_expression = factor(tokens)?;
-                expression =
-                    incorrect_token_error_wrap(BinaryExpression::new(
-                        left_expression,
-                        operator.to_owned(),
-                        right_expression,
-                    ))?;
+                expression = language_error_wrap(BinaryExpression::new(
+                    left_expression,
+                    operator.to_owned(),
+                    right_expression,
+                ))?;
             }
             _ => break,
         }
@@ -554,12 +625,11 @@ fn factor(
                 let operator =
                     tokens.next().expect("no token after peek check - factor");
                 let right_expression = unary(tokens)?;
-                expression =
-                    incorrect_token_error_wrap(BinaryExpression::new(
-                        left_expression,
-                        operator.to_owned(),
-                        right_expression,
-                    ))?;
+                expression = language_error_wrap(BinaryExpression::new(
+                    left_expression,
+                    operator.to_owned(),
+                    right_expression,
+                ))?;
             }
             _ => break,
         }
@@ -567,19 +637,70 @@ fn factor(
     Ok(expression)
 }
 
-// unary → ( "!" | "-" ) unary | primary
+// unary → ( "!" | "-" ) unary | call
 fn unary(tokens: &mut Peekable<Iter<Token>>) -> Result<Expression, ParseError> {
     match tokens.peek() {
         Some(Token::Bang) | Some(Token::Minus) => {
             let token =
                 tokens.next().expect("no token after peek check - unary");
-            incorrect_token_error_wrap(UnaryExpression::new(
+            language_error_wrap(UnaryExpression::new(
                 token.to_owned(),
                 unary(tokens)?,
             ))
         }
-        _ => primary(tokens),
+        _ => call(tokens),
     }
+}
+
+// call -> primary ( "(" arguments? ")" )*
+fn call(tokens: &mut Peekable<Iter<Token>>) -> Result<Expression, ParseError> {
+    let mut expr = primary(tokens)?;
+    let mut call_string = String::new();
+
+    while matches!(tokens.peek(), Some(Token::LeftParen)) {
+        assert_matches!(tokens.next(), Some(Token::LeftParen));
+        call_string = call_string + Token::LeftParen.to_string().as_str();
+
+        // if no arguments
+        if matches!(tokens.peek(), Some(Token::RightParen)) {
+            assert_matches!(tokens.next(), Some(Token::RightParen));
+            expr = CallExpression::new(expr, vec![]);
+            break;
+        }
+
+        let arguments = arguments(tokens)?;
+        expr = CallExpression::new(expr, arguments);
+
+        if !matches!(tokens.peek(), Some(Token::RightParen)) {
+            call_string = call_string
+                + " ... "
+                + &tokens
+                    .peek()
+                    .map(|t| t.to_string())
+                    .unwrap_or(String::from("?"));
+            return Err(ParseError::UnterminatedCall(call_string));
+        }
+        assert_matches!(tokens.next(), Some(Token::RightParen));
+    }
+
+    Ok(expr)
+}
+
+// arguments  -> expression ( "," expression )*
+fn arguments(
+    tokens: &mut Peekable<Iter<Token>>,
+) -> Result<Vec<Expression>, ParseError> {
+    let mut expressions = vec![expression(tokens)?];
+
+    while matches!(tokens.peek(), Some(Token::Comma)) {
+        assert_matches!(tokens.next(), Some(Token::Comma));
+        expressions.push(expression(tokens)?);
+        if expressions.len() >= 255 {
+            return Err(ParseError::TooManyArguments);
+        }
+    }
+
+    Ok(expressions)
 }
 
 // primary → NUMBER | STRING | "true" | "false" | "nil"
@@ -596,7 +717,7 @@ fn primary(
         | Token::Nil
         | Token::Number(_)
         | Token::String(_) => {
-            incorrect_token_error_wrap(LiteralExpression::new(token.to_owned()))
+            language_error_wrap(LiteralExpression::new(token.to_owned()))
         }
         Token::LeftParen => {
             let expression = expression(tokens)?;
@@ -606,16 +727,16 @@ fn primary(
             }
             Ok(GroupingExpression::new(expression))
         }
-        Token::Identifier(_) => incorrect_token_error_wrap(
-            VariableExpression::new(token.to_owned()),
-        ),
+        Token::Identifier(_) => {
+            language_error_wrap(VariableExpression::new(token.to_owned()))
+        }
         // FIX: cases found till now
         // 1 + ;
         _ => Err(ParseError::Unknown(token.to_owned())),
     }
 }
 
-fn incorrect_token_error_wrap<T>(
+fn language_error_wrap<T>(
     expression: Result<T, LanguageError>,
 ) -> Result<T, ParseError> {
     expression.map_err(|e| match e {
@@ -625,6 +746,13 @@ fn incorrect_token_error_wrap<T>(
         } => ParseError::WrongTokenForExpression {
             expression_type: converted_to,
             token: base_token,
+        },
+        LanguageError::IncorrectStatementConversion {
+            base_statement,
+            converted_to,
+        } => ParseError::WrongStatementForConversion {
+            statement_type: converted_to,
+            statement: base_statement,
         },
         _ => {
             unreachable!("found not handled error during expression wrap: {e}")

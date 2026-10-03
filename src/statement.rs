@@ -19,7 +19,7 @@ use crate::{
 //
 // grammar
 // program   -> statement* EOF
-// declaration -> variableDeclaration | statement
+// declaration -> functionDeclaration | variableDeclaration | statement
 // statement -> exprStmt | printStmt | blockStmt | ifStmt | whileStmt | forStmt
 // exprStmt  -> expression ";"
 // printStmt -> "print" expression ";"
@@ -29,6 +29,9 @@ use crate::{
 // whileStmt -> "while" "(" expression ")" statement
 // forStmt -> "for" "(" varDecl | exprStmt | ";" )
 //              expression? ";" expression? ")" statement
+// functionDeclaration -> "fun" function
+// function -> IDENTIFIER "(" parameters? ")" blockStmt
+// parameters -> IDENTIFIER ( "," IDENTIFIER )*
 //
 // NOTE: forStmt is syntactic sugar for whileStmt
 #[derive(Debug, Display)]
@@ -43,6 +46,7 @@ pub enum Statement {
     Block(BlockStatement),
     If(IfStatement),
     While(WhileStatement),
+    Function(FunctionDeclarationStatement),
 }
 
 pub trait StatementVisitor<R> {
@@ -58,6 +62,8 @@ pub trait StatementVisitor<R> {
     fn visit_block(&mut self, statement: &BlockStatement) -> R;
     fn visit_if(&mut self, statement: &IfStatement) -> R;
     fn visit_while(&mut self, statement: &WhileStatement) -> R;
+    fn visit_function(&mut self, statement: &FunctionDeclarationStatement)
+    -> R;
 }
 
 impl Statement {
@@ -71,6 +77,7 @@ impl Statement {
             Statement::Block(s) => visitor.visit_block(s),
             Statement::If(s) => visitor.visit_if(s),
             Statement::While(s) => visitor.visit_while(s),
+            Statement::Function(s) => visitor.visit_function(s),
         }
     }
 }
@@ -165,5 +172,40 @@ impl WhileStatement {
             condition,
             body: Box::new(body),
         })
+    }
+}
+
+// functionDeclaration -> "fun" function
+// function -> IDENTIFIER "(" parameters? ")" blockStmt
+// parameters -> IDENTIFIER ( "," IDENTIFIER )*
+#[derive(Debug)]
+pub struct FunctionDeclarationStatement {
+    pub name: VariableToken,
+    pub parameters: Vec<VariableToken>,
+    pub body: BlockStatement,
+}
+
+impl FunctionDeclarationStatement {
+    pub fn new(
+        name: Token,
+        parameters: Vec<Token>,
+        body: Statement,
+    ) -> Result<Statement, LanguageError> {
+        let name = name.try_into()?;
+        let parameters: Vec<VariableToken> = parameters
+            .into_iter()
+            .map(|p| <Token as TryInto<VariableToken>>::try_into(p))
+            .collect::<Result<Vec<VariableToken>, LanguageError>>()?;
+        let Statement::Block(body) = body else {
+            return Err(LanguageError::IncorrectStatementConversion {
+                base_statement: body,
+                converted_to: "BlockStatement",
+            });
+        };
+        Ok(Statement::Function(Self {
+            name,
+            parameters,
+            body,
+        }))
     }
 }
