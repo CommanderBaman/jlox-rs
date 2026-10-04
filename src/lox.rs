@@ -1,9 +1,6 @@
 use crate::{
-    error::LanguageError,
-    // expression::print::rpn::RpnPrinter as ExpressionPrinter,
-    interpreter::Interpreter,
-    parser::parse,
-    token::scan_tokens,
+    error::LanguageError, function::add_native_functions,
+    interpreter::Interpreter, parser::parse, token::scan_tokens,
 };
 
 pub struct Lox {
@@ -13,9 +10,10 @@ pub struct Lox {
 
 impl Lox {
     pub fn new(interactive: bool) -> Self {
+        let mut interpreter = Interpreter::new(interactive);
+        add_native_functions(&mut interpreter);
         Self {
-            interpreter: Interpreter::new(interactive),
-            // interactive,
+            interpreter, // interactive,
         }
     }
     pub fn run(

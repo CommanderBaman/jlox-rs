@@ -1,6 +1,7 @@
 use std::{
     cmp::Ordering,
     ops::{Add, Div, Mul, Sub},
+    rc::Rc,
 };
 
 use strum::Display;
@@ -14,6 +15,7 @@ use crate::{
         LiteralToken, LogicalExpression, LogicalOperator, UnaryExpression,
         UnaryOperator, VariableExpression,
     },
+    function::LoxCallable,
     statement::{
         BlockStatement, ExpressionStatement, FunctionDeclarationStatement,
         IfStatement, PrintStatement, Statement, StatementVisitor,
@@ -22,7 +24,7 @@ use crate::{
     token::Token,
 };
 
-#[derive(Display, PartialEq, PartialOrd, Clone)]
+#[derive(Display, Clone)]
 pub enum Value {
     #[strum(to_string = "{0}")]
     Bool(bool),
@@ -34,6 +36,7 @@ pub enum Value {
     String(String),
     #[strum(to_string = "uninitialized")]
     Unintialized,
+    Call(Rc<dyn LoxCallable>),
 }
 
 impl Value {
@@ -42,14 +45,42 @@ impl Value {
     }
     fn call(
         &self,
-        _interpreter: &mut Interpreter,
-        _arguments: Vec<Self>,
+        interpreter: &mut Interpreter,
+        arguments: Vec<Self>,
     ) -> Result<Self, RuntimeError> {
-        todo!("value call not implemented")
+        let Value::Call(callee) = self else {
+            return Err(RuntimeError::NotCallable(self.to_string()));
+        };
+        callee.call(interpreter, arguments)
     }
 }
 
-// TODO: research why can't we derive Eq?
+impl PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Value::Call(l), Value::Call(r)) => Rc::ptr_eq(l, r),
+            (Value::Call(_), _) => false,
+            (_, Value::Call(_)) => false,
+            (l, r) => l.eq(r),
+        }
+    }
+}
+
+impl PartialOrd for Value {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match (self, other) {
+            (Value::Call(_), _) => None,
+            (_, Value::Call(_)) => None,
+            (l, r) => l.partial_cmp(r),
+        }
+    }
+}
+
+// research why can't we derive Eq?
+// we can't derive eq because of f64 and later Rc
+// f64 is not eq, because it is not reflexive
+// NaN == NaN in rust comes out as false when it should be true
+// when we manually implment it we are saying that we are okay with it
 impl Eq for Value {}
 
 impl Ord for Value {
@@ -98,6 +129,9 @@ impl TryFrom<Value> for LiteralExpression {
             }),
             Value::Unintialized => {
                 Err(RuntimeError::UnitializedVariableUsed("?".to_owned()))
+            }
+            Value::Call(_) => {
+                todo!("value call to literal expression")
             }
         }
     }
@@ -234,7 +268,7 @@ impl Interpreter {
         {
             // could have used matches! macro
             match statement.expression {
-                Expression::Assignment(_) => {}
+                Expression::Assignment(_) | Expression::Call(_) => {}
                 _ => {
                     println!("{last_value}");
                 }
@@ -442,9 +476,13 @@ impl StatementVisitor<Result<Value, RuntimeError>> for Interpreter {
     }
     fn visit_function(
         &mut self,
-        _statement: &FunctionDeclarationStatement,
+        statement: &FunctionDeclarationStatement,
     ) -> Result<Value, RuntimeError> {
-        todo!("function visit not implemented")
+        self.environment.define(
+            statement.name.clone(),
+            Value::Call(Rc::new(statement.to_owned())),
+        );
+        Ok(Value::Nil)
     }
 }
 

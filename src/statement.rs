@@ -34,7 +34,7 @@ use crate::{
 // parameters -> IDENTIFIER ( "," IDENTIFIER )*
 //
 // NOTE: forStmt is syntactic sugar for whileStmt
-#[derive(Debug, Display)]
+#[derive(Debug, Display, Clone)]
 pub enum Statement {
     #[strum(to_string = "Expression({0:?})")]
     Expression(ExpressionStatement),
@@ -83,7 +83,7 @@ impl Statement {
 }
 
 // exprStmt  → expression ";"
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ExpressionStatement {
     pub expression: Expression,
 }
@@ -95,7 +95,7 @@ impl ExpressionStatement {
 }
 
 // printStmt → "print" expression ";"
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PrintStatement {
     pub expression: Expression,
 }
@@ -107,7 +107,7 @@ impl PrintStatement {
 }
 
 // variableDeclaration -> "var" IDENTIFIER ( "=" expression )? ";"
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct VariableDeclarationStatement {
     pub name: VariableToken,
     pub expression: Option<Expression>,
@@ -126,7 +126,7 @@ impl VariableDeclarationStatement {
 }
 
 // blockStmt -> "{" statement* "}"
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BlockStatement {
     pub statements: Vec<Statement>,
 }
@@ -138,7 +138,7 @@ impl BlockStatement {
 }
 
 // ifStmt -> "if" "(" expression ")" statement ( "else" statement )?
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IfStatement {
     pub condition: Expression,
     pub then_branch: Box<Statement>,
@@ -160,7 +160,7 @@ impl IfStatement {
 }
 
 // whileStmt -> "while" "(" expression ")" statement
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct WhileStatement {
     pub condition: Expression,
     pub body: Box<Statement>,
@@ -178,7 +178,7 @@ impl WhileStatement {
 // functionDeclaration -> "fun" function
 // function -> IDENTIFIER "(" parameters? ")" blockStmt
 // parameters -> IDENTIFIER ( "," IDENTIFIER )*
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FunctionDeclarationStatement {
     pub name: VariableToken,
     pub parameters: Vec<VariableToken>,

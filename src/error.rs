@@ -1,4 +1,4 @@
-use std::{fmt::Debug, process::ExitCode};
+use std::{fmt::Debug, process::ExitCode, time::SystemTimeError};
 
 use thiserror::Error;
 
@@ -22,9 +22,15 @@ pub enum RuntimeError {
     #[error("value is not callable: {0}")]
     NotCallable(String),
     #[error(
-        "incorrect number of arguments received for {0}. Expected {1}, Received {2}"
+        "incorrect number of arguments received for {callee_name}. Expected {expected_arguments}, Received {received_arguments}"
     )]
-    IncorrectNumberOfArguments(String, usize, usize),
+    IncorrectNumberOfArguments {
+        callee_name: String,
+        expected_arguments: usize,
+        received_arguments: usize,
+    },
+    #[error("time error: {0}")]
+    IllegalTime(#[from] SystemTimeError),
 }
 
 #[derive(Error, Debug)]
