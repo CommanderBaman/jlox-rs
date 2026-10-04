@@ -18,13 +18,13 @@ use crate::{
     function::LoxCallable,
     statement::{
         BlockStatement, ExpressionStatement, FunctionDeclarationStatement,
-        IfStatement, PrintStatement, Statement, StatementVisitor,
-        VariableDeclarationStatement, WhileStatement,
+        IfStatement, PrintStatement, ReturnStatement, Statement,
+        StatementVisitor, VariableDeclarationStatement, WhileStatement,
     },
     token::Token,
 };
 
-#[derive(Display, Clone)]
+#[derive(Debug, Display, Clone)]
 pub enum Value {
     #[strum(to_string = "{0}")]
     Bool(bool),
@@ -483,6 +483,18 @@ impl StatementVisitor<Result<Value, RuntimeError>> for Interpreter {
             Value::Call(Rc::new(statement.to_owned())),
         );
         Ok(Value::Nil)
+    }
+    fn visit_return(
+        &mut self,
+        statement: &ReturnStatement,
+    ) -> Result<Value, RuntimeError> {
+        let value = statement
+            .value
+            .as_ref()
+            .map(|expr| self.evaluate(expr))
+            .transpose()?
+            .unwrap_or(Value::Nil);
+        Err(RuntimeError::Return(value))
     }
 }
 

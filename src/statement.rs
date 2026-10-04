@@ -20,7 +20,8 @@ use crate::{
 // grammar
 // program   -> statement* EOF
 // declaration -> functionDeclaration | variableDeclaration | statement
-// statement -> exprStmt | printStmt | blockStmt | ifStmt | whileStmt | forStmt
+// statement -> exprStmt | printStmt | blockStmt | ifStmt
+//              | whileStmt | forStmt | returnStmt
 // exprStmt  -> expression ";"
 // printStmt -> "print" expression ";"
 // variableDeclaration -> "var" IDENTIFIER ( "=" expression )? ";"
@@ -32,6 +33,7 @@ use crate::{
 // functionDeclaration -> "fun" function
 // function -> IDENTIFIER "(" parameters? ")" blockStmt
 // parameters -> IDENTIFIER ( "," IDENTIFIER )*
+// returnStmt -> "return" expression? ";"
 //
 // NOTE: forStmt is syntactic sugar for whileStmt
 #[derive(Debug, Display, Clone)]
@@ -47,6 +49,7 @@ pub enum Statement {
     If(IfStatement),
     While(WhileStatement),
     Function(FunctionDeclarationStatement),
+    Return(ReturnStatement),
 }
 
 pub trait StatementVisitor<R> {
@@ -64,6 +67,7 @@ pub trait StatementVisitor<R> {
     fn visit_while(&mut self, statement: &WhileStatement) -> R;
     fn visit_function(&mut self, statement: &FunctionDeclarationStatement)
     -> R;
+    fn visit_return(&mut self, statement: &ReturnStatement) -> R;
 }
 
 impl Statement {
@@ -78,6 +82,7 @@ impl Statement {
             Statement::If(s) => visitor.visit_if(s),
             Statement::While(s) => visitor.visit_while(s),
             Statement::Function(s) => visitor.visit_function(s),
+            Statement::Return(s) => visitor.visit_return(s),
         }
     }
 }
@@ -207,5 +212,17 @@ impl FunctionDeclarationStatement {
             parameters,
             body,
         }))
+    }
+}
+
+// returnStmt -> "return" expression? ";"
+#[derive(Debug, Clone)]
+pub struct ReturnStatement {
+    pub value: Option<Expression>,
+}
+
+impl ReturnStatement {
+    pub fn new(value: Option<Expression>) -> Statement {
+        Statement::Return(Self { value })
     }
 }

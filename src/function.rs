@@ -1,4 +1,5 @@
 use std::{
+    fmt::Debug,
     rc::Rc,
     time::{self, UNIX_EPOCH},
 };
@@ -17,6 +18,12 @@ pub trait LoxCallable {
         interpreter: &mut Interpreter,
         arguments: Vec<Value>,
     ) -> Result<Value, RuntimeError>;
+}
+
+impl Debug for dyn LoxCallable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "LoxCallable({} args)", self.arity())
+    }
 }
 
 impl LoxCallable for FunctionDeclarationStatement {
@@ -43,7 +50,10 @@ impl LoxCallable for FunctionDeclarationStatement {
         }
         let value = interpreter.visit_block(&self.body);
         interpreter.environment.pop_child()?;
-        value
+        match value {
+            Err(RuntimeError::Return(v)) => Ok(v),
+            v => v,
+        }
     }
 }
 

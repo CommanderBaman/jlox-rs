@@ -9,8 +9,8 @@ use crate::{
     },
     statement::{
         BlockStatement, ExpressionStatement, FunctionDeclarationStatement,
-        IfStatement, PrintStatement, Statement, VariableDeclarationStatement,
-        WhileStatement,
+        IfStatement, PrintStatement, ReturnStatement, Statement,
+        VariableDeclarationStatement, WhileStatement,
     },
     token::Token,
 };
@@ -18,7 +18,8 @@ use crate::{
 // grammar
 // program   -> declaration* EOF
 // declaration -> functionDeclaration | variableDeclaration | statement
-// statement -> exprStmt | printStmt | blockStmt | ifStmt | whileStmt | forStmt
+// statement -> exprStmt | printStmt | blockStmt | ifStmt
+//              | whileStmt | forStmt | returnStmt
 // exprStmt  -> expression ";"
 // printStmt -> "print" expression ";"
 // variableDeclaration -> "var" IDENTIFIER ( "=" expression )? ";"
@@ -30,6 +31,7 @@ use crate::{
 // functionDeclaration -> "fun" function
 // function -> IDENTIFIER "(" parameters? ")" blockStmt
 // parameters -> IDENTIFIER ( "," IDENTIFIER )*
+// returnStmt -> "return" expression? ";"
 pub(super) fn parse(
     tokens: &Vec<Token>,
 ) -> Result<Vec<Statement>, LanguageError> {
@@ -93,6 +95,7 @@ fn declaration(
 }
 
 // statement -> exprStmt | printStmt | blockStmt | ifStmt
+//              | whileStmt | forStmt | returnStmt
 //
 // I wanted to extract out the ";" logic into this
 // but that went sideways due to introduction of block, if, etc.
@@ -109,6 +112,7 @@ fn statement(
         Some(Token::If) => if_statement(tokens),
         Some(Token::While) => while_statement(tokens),
         Some(Token::For) => for_statement(tokens),
+        Some(Token::Return) => return_statement(tokens),
         _ => expression_statement(tokens),
     }
 }
@@ -396,6 +400,25 @@ fn for_statement(
     }
 
     Ok(body)
+}
+
+fn return_statement(
+    tokens: &mut Peekable<Iter<Token>>,
+) -> Result<Statement, ParseError> {
+    // have to be return otherwise function should not be called
+    assert_matches!(tokens.next(), Some(Token::Return));
+    let mut expr = None;
+    if !matches!(tokens.peek(), Some(Token::Semicolon)) {
+        expr = Some(expression(tokens)?);
+    }
+    if tokens.next_if(|t| matches!(t, Token::Semicolon)).is_none() {
+        return Err(ParseError::UnterminatedStatement(format!(
+            "return {}",
+            expr.map(|e| e.to_string())
+                .unwrap_or("unreachable".to_string())
+        )));
+    }
+    Ok(ReturnStatement::new(expr))
 }
 
 // grammar

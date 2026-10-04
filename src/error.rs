@@ -2,7 +2,10 @@ use std::{fmt::Debug, process::ExitCode, time::SystemTimeError};
 
 use thiserror::Error;
 
-use crate::{expression::Expression, statement::Statement, token::Token};
+use crate::{
+    expression::Expression, interpreter::Value, statement::Statement,
+    token::Token,
+};
 
 #[derive(Error, Debug)]
 pub enum RuntimeError {
@@ -31,6 +34,8 @@ pub enum RuntimeError {
     },
     #[error("time error: {0}")]
     IllegalTime(#[from] SystemTimeError),
+    #[error("return called outside scope")]
+    Return(Value),
 }
 
 #[derive(Error, Debug)]
