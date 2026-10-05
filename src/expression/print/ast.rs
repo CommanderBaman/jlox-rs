@@ -94,7 +94,7 @@ mod test {
             ),
         ];
 
-        let printer = SimpleAstPrinter::new();
+        let mut printer = SimpleAstPrinter::new();
         for (expression, result) in expressions {
             assert_eq!(result, printer.to_string(&expression))
         }
@@ -119,7 +119,7 @@ mod test {
             ),
         ];
 
-        let printer = SimpleAstPrinter::new();
+        let mut printer = SimpleAstPrinter::new();
         for (expression, result) in expressions {
             assert_eq!(result, printer.to_string(&expression))
         }
@@ -141,7 +141,7 @@ mod test {
             ),
         )
         .expect("-123 * (45.67) is a correct expression");
-        let printer = SimpleAstPrinter::new();
+        let mut printer = SimpleAstPrinter::new();
         assert_eq!(
             printer.to_string(&expression),
             "(Star (Minus Number(123)) (group Number(45.67)))"

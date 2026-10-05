@@ -102,7 +102,7 @@ mod test {
             ),
         )
         .expect("(1 + 2) * (4 - 3) is expression");
-        let printer = RpnPrinter::new();
+        let mut printer = RpnPrinter::new();
         assert_eq!(
             printer.to_string(&expression),
             "Number(1) Number(2) Plus Number(4) Number(3) Minus Star"
