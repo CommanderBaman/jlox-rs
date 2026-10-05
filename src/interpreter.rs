@@ -55,17 +55,27 @@ impl Value {
     }
 }
 
+// we have to specify the == here for each pair because
+// (l, r) => l.eq(r) does not work
+// it just loops back this function again, causing infinite recursion
 impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
+            (Value::Bool(l), Value::Bool(r)) => l == r,
+            (Value::Nil, Value::Nil) => true,
+            (Value::Number(l), Value::Number(r)) => l == r,
+            (Value::String(l), Value::String(r)) => l == r,
+            (Value::Unintialized, Value::Unintialized) => true,
             (Value::Call(l), Value::Call(r)) => Rc::ptr_eq(l, r),
-            (Value::Call(_), _) => false,
-            (_, Value::Call(_)) => false,
-            (l, r) => l.eq(r),
+            _ => false,
         }
     }
 }
 
+// we do not face the same problem as PartialEq because we use Ord for
+// all the ordering that we do. Hence, I believe this is never called.
+// I also checked this via lldb when I couldn't set a breakpoint in this
+// block but could set it for Ord block
 impl PartialOrd for Value {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         match (self, other) {
