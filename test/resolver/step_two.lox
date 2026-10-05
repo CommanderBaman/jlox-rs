@@ -1,0 +1,6 @@
+{
+    var b = "outer";
+    {
+        print b == "outer";
+    }
+}

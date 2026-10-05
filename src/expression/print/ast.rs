@@ -50,7 +50,7 @@ impl ExpressionVisitor<String> for SimpleAstPrinter {
             expression.right_expression.accept(self),
         )
     }
-    fn visit_variable(&self, expression: &VariableExpression) -> String {
+    fn visit_variable(&mut self, expression: &VariableExpression) -> String {
         format!("(variable {})", expression.variable)
     }
     fn visit_assignment(

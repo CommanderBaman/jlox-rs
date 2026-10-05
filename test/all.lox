@@ -1,0 +1,110 @@
+print "------------------";
+print " Expression Tests ";
+print "------------------";
+print "1 == 1";
+print 1 == 1;
+print "1 + 2 == 3";
+print 1 + 2 == 3;
+print "precedence: 1 + 2 * 3 + 4 / 2 == 9";
+print 1 + 2 * 3 + 4 / 2 == 9;
+
+print "";
+print "----------------------------";
+print " Variable Declaration Tests ";
+print "----------------------------";
+var a = 2;
+print "a == 2";
+print a == 2;
+
+
+print "";
+print "-------------";
+print " Block Tests ";
+print "-------------";
+var a = "global a";
+var b = "global b";
+var c = "global c";
+{
+    var a = "outer a"; 
+    var b = "outer b";
+    {
+        var a = "inner a";
+        print "a == 'inner a'";
+        print a == "inner a";
+        print "b == 'outer b'";
+        print b == "outer b";
+        print "c == 'global c'";
+        print c == "global c";
+    }
+    print "a == 'outer a'";
+    print a == "outer a";
+    print "b == 'outer b'";
+    print b == "outer b";
+    print "c == 'global c'";
+    print c == "global c";
+}
+print "a == 'global a'";
+print a == "global a";
+print "b == 'global b'";
+print b == "global b";
+print "c == 'global c'";
+print c == "global c";
+
+
+print "";
+print "----------";
+print " If Tests ";
+print "----------";
+
+print "basic if";
+if (true) print true;
+
+print "basic else";
+if (false) print false; else print true;
+
+print "";
+print "---------------";
+print " Logical Tests ";
+print "---------------";
+
+print "OR TT";
+print true or true;
+print "OR TF";
+print true or false;
+print "OR FT";
+print false or true;
+print "OR FF";
+print (false or false) == false;
+
+print "and TT";
+print true and true;
+print "and TF";
+print (true and false) == false;
+print "and FT";
+print (false and true) == false;
+print "and FF";
+print (false and false) == false;
+
+print "('hi' or 2) == 'hi'";
+print ("hi" or 2) == "hi";
+print "(nil or 'yes') == 'yes'"; 
+print (nil or "yes") == "yes"; 
+
+
+print "precedence: F or T == F is F";
+print (false or true == false) == false;
+print "precedence: (F or T) == T is T";
+print ((false or true) == true) == true;
+
+print "";
+print "--------------";
+print " While Tests ";
+print "--------------";
+
+var a = 0;
+print "a initialized to 0";
+print a == 0;
+while (a < 3) { a = a + 1;}
+print "a incremented to 3 in while";
+print a == 3;
+

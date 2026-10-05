@@ -1,6 +1,7 @@
 use crate::{
     error::LanguageError, function::add_native_functions,
-    interpreter::Interpreter, parser::parse, token::scan_tokens,
+    interpreter::Interpreter, parser::parse, resolver::Resolver,
+    token::scan_tokens,
 };
 
 pub struct Lox {
@@ -32,6 +33,9 @@ impl Lox {
         // println!("value = {}", value);
 
         let statements = parse(&tokens)?;
+
+        let mut resolver = Resolver::new(&mut self.interpreter);
+        resolver.resolve(&statements)?;
         self.interpreter.interpret(&statements)?;
         Ok(())
     }

@@ -99,4 +99,37 @@ impl Environment {
         assert!(result);
         Ok(())
     }
+    pub fn lookup(
+        &self,
+        name: &VariableToken,
+        hop: Option<usize>,
+    ) -> Option<&Value> {
+        let block = match hop {
+            None => self.blocks.first(),
+            Some(hop) => self.blocks.get(self.blocks.len() - hop - 1),
+        };
+        // TODO: remove this expect, with an error
+        // assert as expect
+        let block = block.expect("block at hop is present at lookup");
+        block.get(name)
+    }
+    pub fn assign_at(
+        &mut self,
+        name: &VariableToken,
+        value: Value,
+        hop: Option<usize>,
+    ) -> Result<(), RuntimeError> {
+        if let Some(hop) = hop {
+            let index = self.blocks.len() - hop - 1;
+            let block = self
+                .blocks
+                .get_mut(index)
+                .expect("block at hop is present at assign");
+            let result = block.assign(name, value);
+            assert!(result);
+            Ok(())
+        } else {
+            self.assign(name, value)
+        }
+    }
 }

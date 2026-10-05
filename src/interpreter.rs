@@ -1,5 +1,6 @@
 use std::{
     cmp::Ordering,
+    collections::HashMap,
     ops::{Add, Div, Mul, Sub},
     rc::Rc,
 };
@@ -16,6 +17,7 @@ use crate::{
         UnaryOperator, VariableExpression,
     },
     function::LoxCallable,
+    resolver::Address,
     statement::{
         BlockStatement, ExpressionStatement, FunctionDeclarationStatement,
         IfStatement, PrintStatement, ReturnStatement, Statement,
@@ -250,6 +252,7 @@ impl Div for Value {
 pub struct Interpreter {
     pub environment: Environment,
     print_expression: bool,
+    locals: HashMap<usize, usize>,
 }
 
 impl Interpreter {
@@ -257,6 +260,7 @@ impl Interpreter {
         Interpreter {
             environment: Environment::new(),
             print_expression,
+            locals: HashMap::new(),
         }
     }
     pub fn evaluate(
@@ -291,6 +295,9 @@ impl Interpreter {
         statement: &Statement,
     ) -> Result<Value, RuntimeError> {
         statement.accept(self)
+    }
+    pub fn resolve(&mut self, location: usize, depth: usize) {
+        self.locals.insert(location, depth);
     }
 }
 
@@ -364,11 +371,12 @@ impl ExpressionVisitor<Result<Value, RuntimeError>> for Interpreter {
         }
     }
     fn visit_variable(
-        &self,
+        &mut self,
         expression: &VariableExpression,
     ) -> Result<Value, RuntimeError> {
+        let addr = expression.addr();
         self.environment
-            .get(&expression.variable)
+            .lookup(&expression.variable, self.locals.get(&addr).cloned())
             .cloned()
             .ok_or_else(|| {
                 RuntimeError::VariableNotFound(expression.variable.to_string())

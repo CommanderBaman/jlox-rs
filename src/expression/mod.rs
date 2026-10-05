@@ -27,7 +27,7 @@ pub trait ExpressionVisitor<R> {
     fn visit_grouping(&mut self, expression: &GroupingExpression) -> R;
     fn visit_unary(&mut self, expression: &UnaryExpression) -> R;
     fn visit_binary(&mut self, expression: &BinaryExpression) -> R;
-    fn visit_variable(&self, expression: &VariableExpression) -> R;
+    fn visit_variable(&mut self, expression: &VariableExpression) -> R;
     fn visit_assignment(&mut self, expression: &AssignmentExpression) -> R;
     fn visit_logical(&mut self, expression: &LogicalExpression) -> R;
     fn visit_call(&mut self, expression: &CallExpression) -> R;

@@ -1,0 +1,25 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+version: "3"
+tasks:
+  run:
+    aliases:
+      - interpreter
+    cmds:
+      - cargo run
+  run:file:
+    requires:
+      vars:
+        - FILE
+    cmds:
+      - cargo run -- {{.FILE}}
+  test:
+    silent: true
+    desc: run the test file
+    cmds:
+      - |
+        status=0
+        cargo run -- test/all.lox > /dev/null 2>&1 || status=$?
+        [ $status -ne 0 ] && printf "can not run test file.\ntry: task run:file FILE=test/all.lox\n" && exit $status
+        cargo run -- test/all.lox | rg false -B 1 || status=$?
+        [ $status -ne 1 ] && printf "not passed\ncheck false cases above\n"
+        [ $status -eq 1 ]

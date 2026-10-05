@@ -8,6 +8,18 @@ use crate::{
 };
 
 #[derive(Error, Debug)]
+pub enum ResolverError {
+    #[error("given variable is already defined: {0}")]
+    AlreadyDefined(String),
+    #[error("can not read local variable {0} before its initializer")]
+    UsageBeforeDeclaration(String),
+    #[error("unknown: {0}")]
+    Unknown(String),
+    #[error("return called from top level of code")]
+    TopLevelReturn,
+}
+
+#[derive(Error, Debug)]
 pub enum RuntimeError {
     #[error("invalid operation {operation} on expression {expression:?}")]
     InvalidOperation {
@@ -34,7 +46,7 @@ pub enum RuntimeError {
     },
     #[error("time error: {0}")]
     IllegalTime(#[from] SystemTimeError),
-    #[error("return called outside scope")]
+    #[error("return called from somewhere unknown")]
     Return(Value),
 }
 
@@ -102,6 +114,8 @@ pub enum LanguageError {
     Parse(Vec<ParseError>),
     #[error("runtime error: {0}")]
     Runtime(#[from] RuntimeError),
+    #[error("semantic analysis error: {0}")]
+    Resolver(#[from] ResolverError),
 }
 
 #[derive(Error, Debug)]

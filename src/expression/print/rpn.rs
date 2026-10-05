@@ -50,7 +50,7 @@ impl ExpressionVisitor<String> for RpnPrinter {
             expression.operator
         )
     }
-    fn visit_variable(&self, _expression: &VariableExpression) -> String {
+    fn visit_variable(&mut self, _expression: &VariableExpression) -> String {
         unimplemented!()
     }
     fn visit_assignment(
