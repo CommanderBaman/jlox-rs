@@ -1,5 +1,5 @@
 use crate::{
-    error::{CliError, LanguageError},
+    error::{CliError, LanguageError, ParseError},
     lox::Lox,
 };
 use std::{
@@ -65,17 +65,44 @@ fn run_prompt() -> Result<(), CliError> {
     let mut input = String::new();
     println!("starting lox interpreter");
     let mut line_count = 1;
+    let mut saved = String::new();
+    let mut in_block = false;
     loop {
-        print!("> ");
+        if !in_block {
+            print!("> ");
+            saved = String::new();
+        }
         io::stdout().flush()?;
         io::stdin().read_line(&mut input)?;
         let cleaned_input = input.trim();
         if cleaned_input.is_empty() {
+            if in_block {
+                in_block = false;
+                continue;
+            }
             break;
         }
-        match program.run(&input, &line_count) {
-            Ok(()) => {}
+        saved = saved + &input;
+        match program.run(&saved, &line_count) {
+            Ok(()) => {
+                in_block = false;
+            }
+            Err(LanguageError::Parse(p))
+                if p.len() == 1
+                    && p.first()
+                        .map(|e| {
+                            matches!(
+                                e,
+                                ParseError::UnterminatedBlock(_)
+                                    | ParseError::UnterminatedCall(_)
+                            )
+                        })
+                        .unwrap_or(false) =>
+            {
+                in_block = true;
+            }
             Err(e) => {
+                in_block = false;
                 println!("language error in above line: {e}");
             }
         }
