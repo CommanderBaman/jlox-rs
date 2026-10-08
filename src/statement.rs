@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 
+use std::rc::Rc;
+
 use strum::Display;
 
 use crate::{
@@ -39,50 +41,55 @@ use crate::{
 #[derive(Debug, Display, Clone)]
 pub enum Statement {
     #[strum(to_string = "Expression({0:?})")]
-    Expression(ExpressionStatement),
+    Expression(Rc<ExpressionStatement>),
     #[strum(to_string = "Print({0:?})")]
-    Print(PrintStatement),
+    Print(Rc<PrintStatement>),
     #[strum(to_string = "VariableDeclaration({0:?})")]
-    VariableDeclaration(VariableDeclarationStatement),
+    VariableDeclaration(Rc<VariableDeclarationStatement>),
     #[strum(to_string = "Block({0:?})")]
-    Block(BlockStatement),
-    If(IfStatement),
-    While(WhileStatement),
-    Function(FunctionDeclarationStatement),
-    Return(ReturnStatement),
+    Block(Rc<BlockStatement>),
+    If(Rc<IfStatement>),
+    While(Rc<WhileStatement>),
+    Function(Rc<FunctionDeclarationStatement>),
+    Return(Rc<ReturnStatement>),
 }
 
 pub trait StatementVisitor<R> {
     // NOTE: expression and print require mut because of expressions like this
     // (a = 2) OR  print a = 2;
     // both of them have assignment expression and can change state
-    fn visit_expression(&mut self, statement: &ExpressionStatement) -> R;
-    fn visit_print(&mut self, statement: &PrintStatement) -> R;
+    fn visit_expression(&mut self, statement: Rc<ExpressionStatement>) -> R;
+    fn visit_print(&mut self, statement: Rc<PrintStatement>) -> R;
     fn visit_variable_declaration(
         &mut self,
-        statement: &VariableDeclarationStatement,
+        statement: Rc<VariableDeclarationStatement>,
     ) -> R;
-    fn visit_block(&mut self, statement: &BlockStatement) -> R;
-    fn visit_if(&mut self, statement: &IfStatement) -> R;
-    fn visit_while(&mut self, statement: &WhileStatement) -> R;
-    fn visit_function(&mut self, statement: &FunctionDeclarationStatement)
-    -> R;
-    fn visit_return(&mut self, statement: &ReturnStatement) -> R;
+    fn visit_block(&mut self, statement: Rc<BlockStatement>) -> R;
+    fn visit_if(&mut self, statement: Rc<IfStatement>) -> R;
+    fn visit_while(&mut self, statement: Rc<WhileStatement>) -> R;
+    fn visit_function(
+        &mut self,
+        statement: Rc<FunctionDeclarationStatement>,
+    ) -> R;
+    fn visit_return(&mut self, statement: Rc<ReturnStatement>) -> R;
 }
 
 impl Statement {
-    pub fn accept<R, T: StatementVisitor<R>>(&self, visitor: &mut T) -> R {
-        match self {
-            Statement::Print(s) => visitor.visit_print(s),
-            Statement::Expression(s) => visitor.visit_expression(s),
+    pub fn accept<R, T: StatementVisitor<R>>(
+        statement: Rc<Statement>,
+        visitor: &mut T,
+    ) -> R {
+        match &*statement {
+            Statement::Print(s) => visitor.visit_print(s.clone()),
+            Statement::Expression(s) => visitor.visit_expression(s.clone()),
             Statement::VariableDeclaration(s) => {
-                visitor.visit_variable_declaration(s)
+                visitor.visit_variable_declaration(s.clone())
             }
-            Statement::Block(s) => visitor.visit_block(s),
-            Statement::If(s) => visitor.visit_if(s),
-            Statement::While(s) => visitor.visit_while(s),
-            Statement::Function(s) => visitor.visit_function(s),
-            Statement::Return(s) => visitor.visit_return(s),
+            Statement::Block(s) => visitor.visit_block(s.clone()),
+            Statement::If(s) => visitor.visit_if(s.clone()),
+            Statement::While(s) => visitor.visit_while(s.clone()),
+            Statement::Function(s) => visitor.visit_function(s.clone()),
+            Statement::Return(s) => visitor.visit_return(s.clone()),
         }
     }
 }
@@ -95,7 +102,7 @@ pub struct ExpressionStatement {
 
 impl ExpressionStatement {
     pub fn new(expression: Expression) -> Statement {
-        Statement::Expression(Self { expression })
+        Statement::Expression(Rc::new(Self { expression }))
     }
 }
 
@@ -107,7 +114,7 @@ pub struct PrintStatement {
 
 impl PrintStatement {
     pub fn new(expression: Expression) -> Statement {
-        Statement::Print(Self { expression })
+        Statement::Print(Rc::new(Self { expression }))
     }
 }
 
@@ -123,22 +130,24 @@ impl VariableDeclarationStatement {
         name: Token,
         expression: Option<Expression>,
     ) -> Result<Statement, LanguageError> {
-        Ok(Statement::VariableDeclaration(Self {
+        Ok(Statement::VariableDeclaration(Rc::new(Self {
             name: name.try_into()?,
             expression,
-        }))
+        })))
     }
 }
 
 // blockStmt -> "{" statement* "}"
 #[derive(Debug, Clone)]
 pub struct BlockStatement {
-    pub statements: Vec<Statement>,
+    pub statements: Vec<Rc<Statement>>,
 }
 
 impl BlockStatement {
     pub fn new(statements: Vec<Statement>) -> Statement {
-        Statement::Block(Self { statements })
+        Statement::Block(Rc::new(Self {
+            statements: statements.into_iter().map(Rc::new).collect(),
+        }))
     }
 }
 
@@ -146,8 +155,8 @@ impl BlockStatement {
 #[derive(Debug, Clone)]
 pub struct IfStatement {
     pub condition: Expression,
-    pub then_branch: Box<Statement>,
-    pub else_branch: Option<Box<Statement>>,
+    pub then_branch: Rc<Statement>,
+    pub else_branch: Option<Rc<Statement>>,
 }
 
 impl IfStatement {
@@ -156,11 +165,11 @@ impl IfStatement {
         then_branch: Statement,
         else_branch: Option<Statement>,
     ) -> Statement {
-        Statement::If(Self {
+        Statement::If(Rc::new(Self {
             condition,
-            then_branch: Box::new(then_branch),
-            else_branch: else_branch.map(|b| Box::new(b)),
-        })
+            then_branch: Rc::new(then_branch),
+            else_branch: else_branch.map(|b| Rc::new(b)),
+        }))
     }
 }
 
@@ -168,15 +177,15 @@ impl IfStatement {
 #[derive(Debug, Clone)]
 pub struct WhileStatement {
     pub condition: Expression,
-    pub body: Box<Statement>,
+    pub body: Rc<Statement>,
 }
 
 impl WhileStatement {
     pub fn new(condition: Expression, body: Statement) -> Statement {
-        Statement::While(Self {
+        Statement::While(Rc::new(Self {
             condition,
-            body: Box::new(body),
-        })
+            body: Rc::new(body),
+        }))
     }
 }
 
@@ -187,7 +196,7 @@ impl WhileStatement {
 pub struct FunctionDeclarationStatement {
     pub name: VariableToken,
     pub parameters: Vec<VariableToken>,
-    pub body: BlockStatement,
+    pub body: Rc<BlockStatement>,
 }
 
 impl FunctionDeclarationStatement {
@@ -207,11 +216,11 @@ impl FunctionDeclarationStatement {
                 converted_to: "BlockStatement",
             });
         };
-        Ok(Statement::Function(Self {
+        Ok(Statement::Function(Rc::new(Self {
             name,
             parameters,
             body,
-        }))
+        })))
     }
 }
 
@@ -223,6 +232,6 @@ pub struct ReturnStatement {
 
 impl ReturnStatement {
     pub fn new(value: Option<Expression>) -> Statement {
-        Statement::Return(Self { value })
+        Statement::Return(Rc::new(Self { value }))
     }
 }

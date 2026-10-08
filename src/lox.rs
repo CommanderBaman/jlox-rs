@@ -3,6 +3,7 @@ use crate::{
     interpreter::Interpreter, parser::parse, resolver::Resolver,
     token::scan_tokens,
 };
+use std::rc::Rc;
 
 pub struct Lox {
     interpreter: Interpreter,
@@ -32,7 +33,7 @@ impl Lox {
         // let value = interpreter.evaluate(&expression)?;
         // println!("value = {}", value);
 
-        let statements = parse(&tokens)?;
+        let statements = parse(&tokens)?.into_iter().map(Rc::new).collect();
 
         let mut resolver = Resolver::new(&mut self.interpreter);
         resolver.resolve(&statements)?;

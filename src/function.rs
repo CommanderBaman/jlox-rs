@@ -48,7 +48,7 @@ impl LoxCallable for FunctionDeclarationStatement {
                 .environment
                 .define(name.to_owned(), arg.to_owned());
         }
-        let value = interpreter.visit_block(&self.body);
+        let value = interpreter.visit_block(self.body.clone());
         interpreter.environment.pop_child()?;
         match value {
             Err(RuntimeError::Return(v)) => Ok(v),

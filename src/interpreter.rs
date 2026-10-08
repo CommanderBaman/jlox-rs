@@ -271,30 +271,30 @@ impl Interpreter {
     }
     pub fn interpret(
         &mut self,
-        statements: &Vec<Statement>,
+        statements: &Vec<Rc<Statement>>,
     ) -> Result<(), RuntimeError> {
         let mut last_value = Value::Nil;
         for statement in statements {
-            last_value = self.execute(statement)?;
+            last_value = self.execute(statement.clone())?;
         }
+        // print last value if expression
         if self.print_expression
-            && let Some(Statement::Expression(statement)) = statements.last()
+            && let Some(statement) = statements.last()
+            && let Statement::Expression(e) = &**statement
+            && !matches!(
+                e.expression,
+                Expression::Assignment(_) | Expression::Call(_),
+            )
         {
-            // could have used matches! macro
-            match statement.expression {
-                Expression::Assignment(_) | Expression::Call(_) => {}
-                _ => {
-                    println!("{last_value}");
-                }
-            }
-        };
+            println!("{last_value}");
+        }
         Ok(())
     }
     fn execute(
         &mut self,
-        statement: &Statement,
+        statement: Rc<Statement>,
     ) -> Result<Value, RuntimeError> {
-        statement.accept(self)
+        Statement::accept(statement, self)
     }
     pub fn resolve(&mut self, location: usize, depth: usize) {
         self.locals.insert(location, depth);
@@ -427,7 +427,7 @@ impl ExpressionVisitor<Result<Value, RuntimeError>> for Interpreter {
 impl StatementVisitor<Result<Value, RuntimeError>> for Interpreter {
     fn visit_print(
         &mut self,
-        statement: &PrintStatement,
+        statement: Rc<PrintStatement>,
     ) -> Result<Value, RuntimeError> {
         let value = self.evaluate(&statement.expression)?;
         println!("{value}");
@@ -435,13 +435,13 @@ impl StatementVisitor<Result<Value, RuntimeError>> for Interpreter {
     }
     fn visit_expression(
         &mut self,
-        statement: &ExpressionStatement,
+        statement: Rc<ExpressionStatement>,
     ) -> Result<Value, RuntimeError> {
         self.evaluate(&statement.expression)
     }
     fn visit_variable_declaration(
         &mut self,
-        statement: &VariableDeclarationStatement,
+        statement: Rc<VariableDeclarationStatement>,
     ) -> Result<Value, RuntimeError> {
         let value = statement
             .expression
@@ -455,11 +455,11 @@ impl StatementVisitor<Result<Value, RuntimeError>> for Interpreter {
     }
     fn visit_block(
         &mut self,
-        statement: &BlockStatement,
+        statement: Rc<BlockStatement>,
     ) -> Result<Value, RuntimeError> {
         self.environment.push_child();
         for statement in &statement.statements {
-            match self.execute(&statement) {
+            match self.execute(statement.clone()) {
                 Ok(_) => {}
                 Err(e) => {
                     // how much I wish there was a defer
@@ -473,38 +473,36 @@ impl StatementVisitor<Result<Value, RuntimeError>> for Interpreter {
     }
     fn visit_if(
         &mut self,
-        statement: &IfStatement,
+        statement: Rc<IfStatement>,
     ) -> Result<Value, RuntimeError> {
         if self.evaluate(&statement.condition)?.is_truthy() {
-            self.execute(&statement.then_branch)
+            self.execute(statement.then_branch.clone())
         } else if let Some(ref else_branch) = statement.else_branch {
-            self.execute(else_branch)
+            self.execute(else_branch.clone())
         } else {
             Ok(Value::Nil)
         }
     }
     fn visit_while(
         &mut self,
-        statement: &WhileStatement,
+        statement: Rc<WhileStatement>,
     ) -> Result<Value, RuntimeError> {
         while self.evaluate(&statement.condition)?.is_truthy() {
-            self.execute(&statement.body)?;
+            self.execute(statement.body.clone())?;
         }
         Ok(Value::Nil)
     }
     fn visit_function(
         &mut self,
-        statement: &FunctionDeclarationStatement,
+        statement: Rc<FunctionDeclarationStatement>,
     ) -> Result<Value, RuntimeError> {
-        self.environment.define(
-            statement.name.clone(),
-            Value::Call(Rc::new(statement.to_owned())),
-        );
+        self.environment
+            .define(statement.name.clone(), Value::Call(statement.to_owned()));
         Ok(Value::Nil)
     }
     fn visit_return(
         &mut self,
-        statement: &ReturnStatement,
+        statement: Rc<ReturnStatement>,
     ) -> Result<Value, RuntimeError> {
         let value = statement
             .value

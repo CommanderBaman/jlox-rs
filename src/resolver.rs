@@ -1,4 +1,4 @@
-use std::{collections::HashMap, mem};
+use std::{collections::HashMap, mem, rc::Rc};
 
 use crate::{
     error::ResolverError,
@@ -46,18 +46,18 @@ impl<'a> Resolver<'a> {
     }
     pub fn resolve(
         &mut self,
-        statements: &Vec<Statement>,
+        statements: &Vec<Rc<Statement>>,
     ) -> Result<(), ResolverError> {
         for statement in statements {
-            self.resolve_statement(statement)?;
+            self.resolve_statement(statement.clone())?;
         }
         Ok(())
     }
     fn resolve_statement(
         &mut self,
-        statement: &Statement,
+        statement: Rc<Statement>,
     ) -> Result<(), ResolverError> {
-        statement.accept(self)
+        Statement::accept(statement, self)
     }
     fn resolve_expression(
         &mut self,
@@ -111,7 +111,7 @@ impl<'a> Resolver<'a> {
 
     fn resolve_function(
         &mut self,
-        function: &FunctionDeclarationStatement,
+        function: Rc<FunctionDeclarationStatement>,
         kind: FunctionKind,
     ) -> Result<(), ResolverError> {
         let enclosing_function = mem::replace(&mut self.current_function, kind);
@@ -121,7 +121,7 @@ impl<'a> Resolver<'a> {
             self.define(param.clone());
         }
         // actually it was resolve, but I don't like cloning
-        self.visit_block(&function.body)?;
+        self.visit_block(function.body.clone())?;
         self.end_scope();
         self.current_function = enclosing_function;
         Ok(())
@@ -200,18 +200,18 @@ impl ExpressionVisitor<Result<(), ResolverError>> for Resolver<'_> {
 impl StatementVisitor<Result<(), ResolverError>> for Resolver<'_> {
     fn visit_block(
         &mut self,
-        statement: &statement::BlockStatement,
+        statement: Rc<statement::BlockStatement>,
     ) -> Result<(), ResolverError> {
         self.begin_scope();
         for statement in &statement.statements {
-            self.resolve_statement(&statement)?;
+            self.resolve_statement(statement.clone())?;
         }
         self.end_scope();
         Ok(())
     }
     fn visit_variable_declaration(
         &mut self,
-        statement: &statement::VariableDeclarationStatement,
+        statement: Rc<statement::VariableDeclarationStatement>,
     ) -> Result<(), ResolverError> {
         self.declare(statement.name.clone())?;
         if let Some(initializer) = &statement.expression {
@@ -222,7 +222,7 @@ impl StatementVisitor<Result<(), ResolverError>> for Resolver<'_> {
     }
     fn visit_function(
         &mut self,
-        statement: &statement::FunctionDeclarationStatement,
+        statement: Rc<statement::FunctionDeclarationStatement>,
     ) -> Result<(), ResolverError> {
         self.declare(statement.name.clone())?;
         self.define(statement.name.clone());
@@ -231,30 +231,30 @@ impl StatementVisitor<Result<(), ResolverError>> for Resolver<'_> {
     }
     fn visit_expression(
         &mut self,
-        statement: &statement::ExpressionStatement,
+        statement: Rc<statement::ExpressionStatement>,
     ) -> Result<(), ResolverError> {
         self.resolve_expression(&statement.expression)
     }
     fn visit_if(
         &mut self,
-        statement: &statement::IfStatement,
+        statement: Rc<statement::IfStatement>,
     ) -> Result<(), ResolverError> {
         self.resolve_expression(&statement.condition)?;
-        self.resolve_statement(&statement.then_branch)?;
+        self.resolve_statement(statement.then_branch.clone())?;
         if let Some(else_branch) = &statement.else_branch {
-            self.resolve_statement(else_branch)?;
+            self.resolve_statement(else_branch.clone())?;
         }
         Ok(())
     }
     fn visit_print(
         &mut self,
-        statement: &statement::PrintStatement,
+        statement: Rc<statement::PrintStatement>,
     ) -> Result<(), ResolverError> {
         self.resolve_expression(&statement.expression)
     }
     fn visit_return(
         &mut self,
-        statement: &statement::ReturnStatement,
+        statement: Rc<statement::ReturnStatement>,
     ) -> Result<(), ResolverError> {
         if matches!(self.current_function, FunctionKind::None) {
             return Err(ResolverError::TopLevelReturn);
@@ -266,9 +266,9 @@ impl StatementVisitor<Result<(), ResolverError>> for Resolver<'_> {
     }
     fn visit_while(
         &mut self,
-        statement: &statement::WhileStatement,
+        statement: Rc<statement::WhileStatement>,
     ) -> Result<(), ResolverError> {
         self.resolve_expression(&statement.condition)?;
-        self.resolve_statement(&statement.body)
+        self.resolve_statement(statement.body.clone())
     }
 }

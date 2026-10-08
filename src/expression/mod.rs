@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::{error::LanguageError, token::Token};
 use strum::Display;
 
@@ -98,7 +100,7 @@ impl std::fmt::Display for LiteralExpression {
 // grouping       → "(" expression ")"
 #[derive(Clone, Debug)]
 pub struct GroupingExpression {
-    pub expression: Box<Expression>,
+    pub expression: Rc<Expression>,
 }
 impl GroupingExpression {
     pub fn wrap(self) -> Expression {
@@ -106,7 +108,7 @@ impl GroupingExpression {
     }
     pub fn new(expression: Expression) -> Expression {
         Expression::Grouping(Self {
-            expression: Box::new(expression),
+            expression: Rc::new(expression),
         })
     }
 }
@@ -133,7 +135,7 @@ impl TryFrom<Token> for UnaryOperator {
 #[derive(Clone, Debug)]
 pub struct UnaryExpression {
     pub operator: UnaryOperator,
-    pub expression: Box<Expression>,
+    pub expression: Rc<Expression>,
 }
 impl UnaryExpression {
     pub fn wrap(self) -> Expression {
@@ -146,7 +148,7 @@ impl UnaryExpression {
         let operator = token.try_into()?;
         Ok(Expression::Unary(Self {
             operator,
-            expression: Box::new(expression),
+            expression: Rc::new(expression),
         }))
     }
 }
@@ -189,9 +191,9 @@ impl TryFrom<Token> for BinaryOperator {
 }
 #[derive(Clone, Debug)]
 pub struct BinaryExpression {
-    pub left_expression: Box<Expression>,
+    pub left_expression: Rc<Expression>,
     pub operator: BinaryOperator,
-    pub right_expression: Box<Expression>,
+    pub right_expression: Rc<Expression>,
 }
 impl BinaryExpression {
     pub fn wrap(self) -> Expression {
@@ -204,9 +206,9 @@ impl BinaryExpression {
     ) -> Result<Expression, LanguageError> {
         let operator = token.try_into()?;
         Ok(Expression::Binary(Self {
-            left_expression: Box::new(left_expression),
+            left_expression: Rc::new(left_expression),
             operator,
-            right_expression: Box::new(right_expression),
+            right_expression: Rc::new(right_expression),
         }))
     }
 }
@@ -244,9 +246,9 @@ impl TryFrom<Token> for LogicalOperator {
 }
 #[derive(Clone, Debug)]
 pub struct LogicalExpression {
-    pub left_expression: Box<Expression>,
+    pub left_expression: Rc<Expression>,
     pub operator: LogicalOperator,
-    pub right_expression: Box<Expression>,
+    pub right_expression: Rc<Expression>,
 }
 impl LogicalExpression {
     pub fn wrap(self) -> Expression {
@@ -259,9 +261,9 @@ impl LogicalExpression {
     ) -> Result<Expression, LanguageError> {
         let operator = token.try_into()?;
         Ok(Expression::Logical(Self {
-            left_expression: Box::new(left_expression),
+            left_expression: Rc::new(left_expression),
             operator,
-            right_expression: Box::new(right_expression),
+            right_expression: Rc::new(right_expression),
         }))
     }
 }
@@ -320,7 +322,7 @@ impl std::fmt::Display for VariableExpression {
 #[derive(Clone, Debug)]
 pub struct AssignmentExpression {
     pub variable: VariableToken,
-    pub expression: Box<Expression>,
+    pub expression: Rc<Expression>,
 }
 impl AssignmentExpression {
     pub fn wrap(self) -> Expression {
@@ -329,7 +331,7 @@ impl AssignmentExpression {
     pub fn from(variable: VariableToken, expression: Expression) -> Expression {
         Expression::Assignment(Self {
             variable,
-            expression: Box::new(expression),
+            expression: Rc::new(expression),
         })
     }
 }
@@ -348,7 +350,7 @@ impl std::fmt::Display for AssignmentExpression {
 // call -> primary ( "(" arguments? ")" )*
 #[derive(Clone, Debug)]
 pub struct CallExpression {
-    pub callee: Box<Expression>,
+    pub callee: Rc<Expression>,
     pub arguments: Vec<Expression>,
 }
 impl CallExpression {
@@ -357,7 +359,7 @@ impl CallExpression {
     }
     pub fn new(callee: Expression, arguments: Vec<Expression>) -> Expression {
         Expression::Call(Self {
-            callee: Box::from(callee),
+            callee: Rc::new(callee),
             arguments,
         })
     }
