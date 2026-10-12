@@ -1,0 +1,58 @@
+
+print "1 + 2";
+print 1 + 2;
+print 1 + 2 == 3;
+print "";
+
+print "1 - 2";
+print 1 - 2;
+print 1 - 2 == -1;
+print "";
+
+print "1 * 2";
+print 1 * 2;
+print 1 * 2 == 2;
+print "";
+
+print "1 / 2";
+print 1 / 2;
+print 1 / 2 == 0.5;
+print "";
+
+print "1 + 2 - 3 * 4";
+print 1 + 2 - 3 * 4;
+print 1 + 2 - 3 * 4 == -9;
+print "";
+
+print "-123 * (45.67)";
+print -123 * (45.67);
+print -123 * (45.67) == -5617.41;
+print "";
+
+print "(1 + 2) * (4 - 3)";
+print (1 + 2) * (4 - 3);
+print (1 + 2) * (4 - 3) == 3;
+print "";
+
+print "true or true";
+print true or true;
+print "true or false";
+print true or false;
+print "false or true";
+print false or true;
+print "false or false";
+print false or false == true;
+
+print "false or false";
+print false or false == false;
+print (false or false) == false;
+print false or false;
+
+print "nil or 1 == true";
+print nil or 1 == true;
+
+print "hi" or 2; // "hi"
+print nil or 2; // "hi"
+
+print "hi" or 2; // "hi"
+print nil or 2; // "hi"

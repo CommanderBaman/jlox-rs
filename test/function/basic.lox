@@ -1,0 +1,10 @@
+fun printHello() {
+    fun printWhy() {
+        print "why";
+    }
+    print "hello";
+    printWhy();
+}
+
+printHello();
+printHello();

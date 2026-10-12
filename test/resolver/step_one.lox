@@ -1,7 +1,0 @@
-{
-    var b = "outer";
-    {
-        print b == "outer";
-    }
-    print b == "outer";
-}

@@ -1,0 +1,16 @@
+fun addx(a, b) {
+    var c = 1;
+    return a + b + c;
+}
+
+var c = 5;
+
+print addx(1,2);
+print 3 == addx(1,2);
+
+var c = 4;
+
+fun addc(a, b) {
+    return a + b + c;
+}
+print 8 == addc(2,2);

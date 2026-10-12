@@ -1,0 +1,7 @@
+var a = true;
+
+if (a) print "true is traversed";
+
+a = false;
+
+if (a) print "this should not print"; else print "else is traversed";

@@ -1,0 +1,7 @@
+fun add(a,b) {
+    return a + b;
+}
+
+var c = add(1,2);
+print "c = 3";
+print c == 3;
