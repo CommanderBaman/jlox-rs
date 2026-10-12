@@ -1,25 +1,61 @@
 # yaml-language-server: $schema=https://taskfile.dev/schema.json
 version: "3"
+silent: true
+vars:
+  ALL_TEST_FILE: test/all.lox
+  RELEASE_BUILD_OUTPUT: target/release/jlox-rs
 tasks:
-  run:
-    aliases:
-      - interpreter
+  build:debug:
+    desc: build the debug build
     cmds:
-      - cargo run
+      - cargo build {{.FLAGS}}
+  build:release:
+    desc: build the release build
+    cmds:
+      - cargo build --release {{.FLAGS}}
+  build:
+    desc: build project
+    cmds:
+      - task: build:debug
+  clean:
+    desc: cleanup all the build files
+    cmds:
+      - rm -rf target
   run:file:
+    desc: run the interpreter on a single file
     requires:
       vars:
         - FILE
     cmds:
-      - cargo run -- {{.FILE}}
-  test:
-    silent: true
+      - cargo run --quiet -- {{.FILE}}
+  run:
+    desc: run the interpreter
+    aliases:
+      - interpreter
+    cmds:
+      - cargo run --quiet
+  test:lox:
     desc: run the test file
+    deps:
+      - task: build:release
+        vars:
+          FLAGS: --quiet
     cmds:
       - |
         status=0
-        cargo run -- test/all.lox > /dev/null 2>&1 || status=$?
-        [ $status -ne 0 ] && printf "can not run test file.\ntry: task run:file FILE=test/all.lox\n" && exit $status
-        cargo run -- test/all.lox | rg false -B 1 || status=$?
-        [ $status -ne 1 ] && printf "not passed\ncheck false cases above\n"
+        {{.RELEASE_BUILD_OUTPUT}} {{.ALL_TEST_FILE}} > /dev/null 2>&1 || status=$?
+        [ $status -ne 0 ] && printf "❌ can not run test file\ntry= task run:file FILE={{.ALL_TEST_FILE}}\n" && exit $status
+        {{.RELEASE_BUILD_OUTPUT}} {{.ALL_TEST_FILE}} | rg false -B 1 || status=$?
+        [ $status -ne 1 ] && printf "❌ not passed\ncheck false cases above\n"
         [ $status -eq 1 ]
+  test:unit:
+    desc: run unit tests in the project
+    cmds:
+      - cargo test
+  test:
+    desc: run all tests
+    cmds:
+      - task: test:unit
+      - echo "📝 run lox tests"
+      - task: test:lox
+      - echo "✅ all tests passed"
