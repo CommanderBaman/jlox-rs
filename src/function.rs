@@ -89,7 +89,7 @@ impl LoxCallable for ClockFunction {
 
 pub fn add_native_functions(interpreter: &mut Interpreter) {
     interpreter.environment.define(
-        VariableToken::Identifer("clock".to_owned()),
+        VariableToken::Identifier("clock".to_owned()),
         ClockFunction::as_value(),
     );
 }

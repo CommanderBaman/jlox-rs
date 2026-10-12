@@ -195,7 +195,7 @@ pub fn scan_tokens(line: &str) -> Result<Vec<Token>, LanguageError> {
                         }
                     }
                     tokens.push(Token::Number(buffer.parse().map_err(
-                        |_| LanguageError::UnparseableNumber(buffer),
+                        |_| LanguageError::UnparsableNumber(buffer),
                     )?));
                     continue;
                 }

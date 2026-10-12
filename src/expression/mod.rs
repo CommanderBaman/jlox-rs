@@ -284,13 +284,13 @@ impl std::fmt::Display for LogicalExpression {
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, PartialOrd)]
 pub enum VariableToken {
     #[strum(to_string = "Identifier({0})")]
-    Identifer(String),
+    Identifier(String),
 }
 impl TryFrom<Token> for VariableToken {
     type Error = LanguageError;
     fn try_from(token: Token) -> Result<Self, Self::Error> {
         match token {
-            Token::Identifier(i) => Ok(VariableToken::Identifer(i)),
+            Token::Identifier(i) => Ok(VariableToken::Identifier(i)),
             _ => Err(LanguageError::IncorrectTokenConversion {
                 base_token: token,
                 converted_to: "VariableToken",

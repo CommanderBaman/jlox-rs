@@ -37,13 +37,13 @@ pub enum Value {
     #[strum(to_string = "{0}")]
     String(String),
     #[strum(to_string = "uninitialized")]
-    Unintialized,
+    Uninitialized,
     Call(Rc<dyn LoxCallable>),
 }
 
 impl Value {
     fn is_truthy(&self) -> bool {
-        !matches!(self, Value::Unintialized | Value::Nil | Value::Bool(false))
+        !matches!(self, Value::Uninitialized | Value::Nil | Value::Bool(false))
     }
     fn call(
         &self,
@@ -67,7 +67,7 @@ impl PartialEq for Value {
             (Value::Nil, Value::Nil) => true,
             (Value::Number(l), Value::Number(r)) => l == r,
             (Value::String(l), Value::String(r)) => l == r,
-            (Value::Unintialized, Value::Unintialized) => true,
+            (Value::Uninitialized, Value::Uninitialized) => true,
             (Value::Call(l), Value::Call(r)) => Rc::ptr_eq(l, r),
             _ => false,
         }
@@ -92,7 +92,7 @@ impl PartialOrd for Value {
 // we can't derive eq because of f64 and later Rc
 // f64 is not eq, because it is not reflexive
 // NaN == NaN in rust comes out as false when it should be true
-// when we manually implment it we are saying that we are okay with it
+// when we manually implement it we are saying that we are okay with it
 impl Eq for Value {}
 
 impl Ord for Value {
@@ -139,8 +139,8 @@ impl TryFrom<Value> for LiteralExpression {
             Value::Nil => Ok(LiteralExpression {
                 literal: LiteralToken::Nil,
             }),
-            Value::Unintialized => {
-                Err(RuntimeError::UnitializedVariableUsed("?".to_owned()))
+            Value::Uninitialized => {
+                Err(RuntimeError::UninitializedVariableUsed("?".to_owned()))
             }
             Value::Call(_) => {
                 todo!("value call to literal expression")
@@ -178,8 +178,8 @@ impl Add for Value {
             (Value::Number(l), Value::String(r)) => {
                 Ok(Value::String(format!("{l}{r}")))
             }
-            (Value::Unintialized, _) | (_, Value::Unintialized) => {
-                Err(RuntimeError::UnitializedVariableUsed("?".to_owned()))
+            (Value::Uninitialized, _) | (_, Value::Uninitialized) => {
+                Err(RuntimeError::UninitializedVariableUsed("?".to_owned()))
             }
             _ => Err(RuntimeError::InvalidOperation {
                 operation: "Add".to_owned(),
@@ -194,8 +194,8 @@ impl Sub for Value {
     fn sub(self, rhs: Self) -> Self::Output {
         match (&self, &rhs) {
             (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l - r)),
-            (Value::Unintialized, _) | (_, Value::Unintialized) => {
-                Err(RuntimeError::UnitializedVariableUsed("?".to_owned()))
+            (Value::Uninitialized, _) | (_, Value::Uninitialized) => {
+                Err(RuntimeError::UninitializedVariableUsed("?".to_owned()))
             }
             _ => Err(RuntimeError::InvalidOperation {
                 operation: "Sub".to_owned(),
@@ -210,8 +210,8 @@ impl Mul for Value {
     fn mul(self, rhs: Self) -> Self::Output {
         match (&self, &rhs) {
             (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l * r)),
-            (Value::Unintialized, _) | (_, Value::Unintialized) => {
-                Err(RuntimeError::UnitializedVariableUsed("?".to_owned()))
+            (Value::Uninitialized, _) | (_, Value::Uninitialized) => {
+                Err(RuntimeError::UninitializedVariableUsed("?".to_owned()))
             }
             _ => Err(RuntimeError::InvalidOperation {
                 operation: "Mul".to_owned(),
@@ -238,8 +238,8 @@ impl Div for Value {
                 }
                 Ok(Value::Number(l / r))
             }
-            (Value::Unintialized, _) | (_, Value::Unintialized) => {
-                Err(RuntimeError::UnitializedVariableUsed("?".to_owned()))
+            (Value::Uninitialized, _) | (_, Value::Uninitialized) => {
+                Err(RuntimeError::UninitializedVariableUsed("?".to_owned()))
             }
             _ => Err(RuntimeError::InvalidOperation {
                 operation: "Div".to_owned(),
@@ -448,7 +448,7 @@ impl StatementVisitor<Result<Value, RuntimeError>> for Interpreter {
             .as_ref()
             .map(|ex| self.evaluate(ex))
             .transpose()?
-            .unwrap_or(Value::Unintialized);
+            .unwrap_or(Value::Uninitialized);
         self.environment
             .define(statement.name.clone(), value.clone());
         Ok(value)

@@ -33,7 +33,7 @@ pub enum RuntimeError {
     #[error("code tried to remove root environment")]
     RootEnvironmentRemoved,
     #[error("variable {0} used without initializing")]
-    UnitializedVariableUsed(String),
+    UninitializedVariableUsed(String),
     #[error("value is not callable: {0}")]
     NotCallable(String),
     #[error(
@@ -71,7 +71,7 @@ pub enum ParseError {
     #[error("received token {0:?} instead of identifier after 'var' keyword")]
     IncompleteVariableDeclaration(Option<Token>),
     #[error(
-        "received expresssion {0} instead of variable expression in assignment"
+        "received expression {0} instead of variable expression in assignment"
     )]
     InvalidAssignment(Expression),
     #[error("unknown error on token {0}")]
@@ -93,7 +93,7 @@ pub enum LanguageError {
     #[error("token was incomplete. buffer: {0}")]
     IncompleteToken(String),
     #[error("could not parse token as number: {0}")]
-    UnparseableNumber(String),
+    UnparsableNumber(String),
     #[error("the given string was not terminated: \"{0}\"")]
     UnfinishedString(String),
     #[error(
