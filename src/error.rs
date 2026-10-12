@@ -3,20 +3,30 @@ use std::{fmt::Debug, process::ExitCode, time::SystemTimeError};
 use thiserror::Error;
 
 use crate::{
-    expression::Expression, interpreter::Value, statement::Statement,
+    expression::{Expression, VariableToken},
+    interpreter::Value,
+    statement::Statement,
     token::Token,
 };
 
 #[derive(Error, Debug)]
 pub enum ResolverError {
+    #[error("given variable is already declared: {0}")]
+    AlreadyDeclared(VariableToken),
     #[error("given variable is already defined: {0}")]
-    AlreadyDefined(String),
+    AlreadyDefined(VariableToken),
     #[error("can not read local variable {0} before its initializer")]
-    UsageBeforeDeclaration(String),
-    #[error("unknown: {0}")]
-    Unknown(String),
+    UsageBeforeDeclaration(VariableToken),
+    #[error("can not use local variable {0} before its initializer")]
+    UsageBeforeDefinition(VariableToken),
+    #[error("given variable {0} is not declared")]
+    NotDeclared(VariableToken),
     #[error("return called from top level of code")]
     TopLevelReturn,
+    #[error("unused variables: {}", .0.iter().fold(String::new(), |acc, e| format!("{acc}, {e}")).split_off(2))]
+    UnusedVariables(Vec<VariableToken>),
+    #[error("unknown: {0}")]
+    Unknown(String),
 }
 
 #[derive(Error, Debug)]

@@ -30,8 +30,49 @@ enum FunctionKind {
     Function,
 }
 
+enum VariableState {
+    Define,
+    Declare,
+    Used,
+}
+
+impl VariableState {
+    fn declare(
+        stored: Option<&Self>,
+        name: VariableToken,
+    ) -> Result<Self, ResolverError> {
+        match stored {
+            None => Ok(VariableState::Declare),
+            _ => Err(ResolverError::AlreadyDeclared(name)),
+        }
+    }
+    fn define(&self, name: VariableToken) -> Result<Self, ResolverError> {
+        match self {
+            VariableState::Declare => Ok(VariableState::Define),
+            _ => Err(ResolverError::AlreadyDefined(name)),
+        }
+    }
+    fn consume(&self, name: VariableToken) -> Result<Self, ResolverError> {
+        match self {
+            VariableState::Define => Ok(VariableState::Used),
+            VariableState::Used => Ok(VariableState::Used),
+            VariableState::Declare => {
+                Err(ResolverError::UsageBeforeDefinition(name))
+            }
+        }
+    }
+
+    fn can_use(&self) -> bool {
+        match self {
+            VariableState::Define | VariableState::Used => true,
+            VariableState::Declare => false,
+        }
+    }
+}
+
 pub struct Resolver<'a> {
-    scopes: Vec<HashMap<VariableToken, bool>>,
+    scopes: Vec<HashMap<VariableToken, VariableState>>,
+    resolves: HashMap<usize, usize>,
     interpreter: &'a mut Interpreter,
     current_function: FunctionKind,
 }
@@ -40,6 +81,7 @@ impl<'a> Resolver<'a> {
     pub fn new(interpreter: &'a mut Interpreter) -> Self {
         Self {
             scopes: Vec::new(),
+            resolves: HashMap::new(),
             interpreter,
             current_function: FunctionKind::None,
         }
@@ -69,31 +111,65 @@ impl<'a> Resolver<'a> {
     fn begin_scope(&mut self) {
         self.scopes.push(HashMap::new());
     }
-    fn end_scope(&mut self) {
-        self.scopes.pop();
+    fn end_scope(&mut self) -> Result<(), ResolverError> {
+        if let Some(scope) = self.scopes.pop() {
+            let unused_elements: Vec<VariableToken> = scope
+                .into_iter()
+                // could use filter map but this is better
+                .filter(|(_, state)| !matches!(state, VariableState::Used))
+                .map(|(variable, _)| variable)
+                .collect();
+            if !unused_elements.is_empty() {
+                return Err(ResolverError::UnusedVariables(unused_elements));
+            }
+        }
+        Ok(())
     }
 
     fn declare(&mut self, name: VariableToken) -> Result<(), ResolverError> {
         if let Some(scope) = self.scopes.last_mut() {
-            if scope.contains_key(&name) {
-                return Err(ResolverError::AlreadyDefined(name.to_string()));
-            }
-            scope.insert(name, false);
+            let state = VariableState::declare(scope.get(&name), name.clone())?;
+            scope.insert(name, state);
         }
         Ok(())
     }
-    fn define(&mut self, name: VariableToken) {
+    fn define(&mut self, name: VariableToken) -> Result<(), ResolverError> {
         if let Some(scope) = self.scopes.last_mut() {
-            // WARN: maybe we should throw if not found?
-            scope.insert(name, true);
+            let state = scope
+                .get(&name)
+                .ok_or(ResolverError::NotDeclared(name.clone()))
+                .and_then(|var| var.define(name.clone()))?;
+            scope.insert(name, state);
         }
+        Ok(())
+    }
+    fn consume(
+        &mut self,
+        expression: &expression::VariableExpression,
+    ) -> Result<(), ResolverError> {
+        let Some(num_hops) = self.resolves.get(&expression.addr()) else {
+            // global variable
+            return Ok(());
+        };
+        // FIX: silent panic here because of negation of usize
+        // should be safe though
+        let scope_index = self.scopes.len() - num_hops - 1;
+        if let Some(scope) = self.scopes.get_mut(scope_index) {
+            let name = expression.variable.clone();
+            let state = scope
+                .get(&name)
+                .ok_or(ResolverError::NotDeclared(name.clone()))
+                .and_then(|var| var.consume(name.clone()))?;
+            scope.insert(name, state);
+        }
+        Ok(())
     }
 
-    fn get_from_current_scope(&self, name: &VariableToken) -> Option<bool> {
-        self.scopes
-            .last()
-            .and_then(|scope| scope.get(name))
-            .copied()
+    fn get_from_current_scope(
+        &self,
+        name: &VariableToken,
+    ) -> Option<&VariableState> {
+        self.scopes.last().and_then(|scope| scope.get(name))
     }
 
     fn resolve_local<T: Address>(
@@ -104,6 +180,7 @@ impl<'a> Resolver<'a> {
         for (num_hops, scope) in self.scopes.iter().rev().enumerate() {
             if scope.contains_key(name) {
                 self.interpreter.resolve(expression.addr(), num_hops);
+                self.resolves.insert(expression.addr(), num_hops);
                 break;
             }
         }
@@ -118,11 +195,12 @@ impl<'a> Resolver<'a> {
         self.begin_scope();
         for param in &function.parameters {
             self.declare(param.clone())?;
-            self.define(param.clone());
+            self.define(param.clone())?;
         }
         // actually it was resolve, but I don't like cloning
+        // -> this aged like milk
         self.visit_block(function.body.clone())?;
-        self.end_scope();
+        self.end_scope()?;
         self.current_function = enclosing_function;
         Ok(())
     }
@@ -134,13 +212,16 @@ impl ExpressionVisitor<Result<(), ResolverError>> for Resolver<'_> {
         expression: &expression::VariableExpression,
     ) -> Result<(), ResolverError> {
         if !self.scopes.is_empty()
-            && self.get_from_current_scope(&expression.variable) == Some(false)
+            && self
+                .get_from_current_scope(&expression.variable)
+                .is_some_and(|state| !state.can_use())
         {
             return Err(ResolverError::UsageBeforeDeclaration(
-                expression.variable.to_string(),
+                expression.variable.clone(),
             ));
         }
         self.resolve_local(expression, &expression.variable);
+        self.consume(expression)?;
         Ok(())
     }
     fn visit_assignment(
@@ -206,7 +287,7 @@ impl StatementVisitor<Result<(), ResolverError>> for Resolver<'_> {
         for statement in &statement.statements {
             self.resolve_statement(statement.clone())?;
         }
-        self.end_scope();
+        self.end_scope()?;
         Ok(())
     }
     fn visit_variable_declaration(
@@ -217,7 +298,7 @@ impl StatementVisitor<Result<(), ResolverError>> for Resolver<'_> {
         if let Some(initializer) = &statement.expression {
             self.resolve_expression(initializer)?;
         }
-        self.define(statement.name.clone());
+        self.define(statement.name.clone())?;
         Ok(())
     }
     fn visit_function(
@@ -225,7 +306,7 @@ impl StatementVisitor<Result<(), ResolverError>> for Resolver<'_> {
         statement: Rc<statement::FunctionDeclarationStatement>,
     ) -> Result<(), ResolverError> {
         self.declare(statement.name.clone())?;
-        self.define(statement.name.clone());
+        self.define(statement.name.clone())?;
         self.resolve_function(statement, FunctionKind::Function)?;
         Ok(())
     }

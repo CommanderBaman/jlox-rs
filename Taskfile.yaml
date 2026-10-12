@@ -28,12 +28,22 @@ tasks:
         - FILE
     cmds:
       - cargo run --quiet -- {{.FILE}}
+  run:debug:
+    desc: run the interpreter in development
+    cmds:
+      - cargo run --quiet
+  run:release:
+    desc: run the release interpreter
+    deps:
+      - build:release
+    cmds:
+      - "{{.RELEASE_BUILD_OUTPUT}}"
   run:
     desc: run the interpreter
     aliases:
       - interpreter
     cmds:
-      - cargo run --quiet
+      - task: run:debug
   test:lox:
     desc: run the test file
     deps:
