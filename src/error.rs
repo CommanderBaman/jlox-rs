@@ -92,8 +92,8 @@ pub enum ParseError {
     UnterminatedCall(String),
     #[error("too many arguments given in function call")]
     TooManyArguments,
-    #[error("malformed function declaration: {0}")]
-    MalformedFunctionDeclaration(String),
+    #[error("malformed declaration: {0}")]
+    MalformedDeclaration(String),
 }
 
 #[derive(Error, Debug)]

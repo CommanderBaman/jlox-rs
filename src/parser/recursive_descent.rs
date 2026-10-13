@@ -8,16 +8,18 @@ use crate::{
         UnaryExpression, VariableExpression,
     },
     statement::{
-        BlockStatement, ExpressionStatement, FunctionDeclarationStatement,
-        IfStatement, PrintStatement, ReturnStatement, Statement,
-        VariableDeclarationStatement, WhileStatement,
+        BlockStatement, ClassDeclarationStatement, ExpressionStatement,
+        FunctionDeclarationStatement, IfStatement, PrintStatement,
+        ReturnStatement, Statement, VariableDeclarationStatement,
+        WhileStatement,
     },
     token::Token,
 };
 
 // grammar
 // program   -> declaration* EOF
-// declaration -> functionDeclaration | variableDeclaration | statement
+// declaration -> functionDeclaration | variableDeclaration
+//                  | classDeclaration | statement
 // statement -> exprStmt | printStmt | blockStmt | ifStmt
 //              | whileStmt | forStmt | returnStmt
 // exprStmt  -> expression ";"
@@ -32,6 +34,7 @@ use crate::{
 // function -> IDENTIFIER "(" parameters? ")" blockStmt
 // parameters -> IDENTIFIER ( "," IDENTIFIER )*
 // returnStmt -> "return" expression? ";"
+// classDeclaration ->  "class" IDENTIFIER "{" function* "}"
 pub(super) fn parse(
     tokens: &Vec<Token>,
 ) -> Result<Vec<Statement>, LanguageError> {
@@ -88,6 +91,7 @@ fn declaration(
     tokens: &mut Peekable<Iter<Token>>,
 ) -> Result<Statement, ParseError> {
     match tokens.peek() {
+        Some(Token::Class) => class_declaration_statement(tokens),
         Some(Token::Var) => variable_declaration_statement(tokens),
         Some(Token::Fun) => function_declaration_statement(tokens),
         _ => statement(tokens),
@@ -196,14 +200,14 @@ fn function_declaration_statement(
     assert_matches!(tokens.next(), Some(Token::Fun));
     // identifier
     if !matches!(tokens.peek(), Some(Token::Identifier(_))) {
-        return Err(ParseError::MalformedFunctionDeclaration(
+        return Err(ParseError::MalformedDeclaration(
             "no identifier after fun keyword".to_string(),
         ));
     }
     let name = tokens.next().unwrap();
     // (
     if tokens.next_if(|t| matches!(t, Token::LeftParen)).is_none() {
-        return Err(ParseError::MalformedFunctionDeclaration(
+        return Err(ParseError::MalformedDeclaration(
             "no ( after function declaration".to_string(),
         ));
     }
@@ -211,13 +215,13 @@ fn function_declaration_statement(
     let parameters = parameters(tokens)?;
     // )
     if tokens.next_if(|t| matches!(t, Token::RightParen)).is_none() {
-        return Err(ParseError::MalformedFunctionDeclaration(
+        return Err(ParseError::MalformedDeclaration(
             "no ) after function declaration".to_string(),
         ));
     }
     // body
     if !matches!(tokens.peek(), Some(Token::LeftBrace)) {
-        return Err(ParseError::MalformedFunctionDeclaration(
+        return Err(ParseError::MalformedDeclaration(
             "no { after function declaration".to_string(),
         ));
     }
@@ -242,7 +246,7 @@ fn parameters(
         let Some(variable) =
             tokens.next_if(|t| matches!(t, Token::Identifier(_)))
         else {
-            return Err(ParseError::MalformedFunctionDeclaration(
+            return Err(ParseError::MalformedDeclaration(
                 "no identifier after comma in parameters".to_string(),
             ));
         };
@@ -421,6 +425,42 @@ fn return_statement(
     Ok(ReturnStatement::new(expr))
 }
 
+// classDeclaration ->  "class" IDENTIFIER "{" function* "}"
+fn class_declaration_statement(
+    tokens: &mut Peekable<Iter<Token>>,
+) -> Result<Statement, ParseError> {
+    // have to be return otherwise function should not be called
+    assert_matches!(tokens.next(), Some(Token::Class));
+    // identifier
+    if !matches!(tokens.peek(), Some(Token::Identifier(_))) {
+        return Err(ParseError::MalformedDeclaration(
+            "no identifier after fun keyword".to_string(),
+        ));
+    }
+    let name = tokens.next().unwrap();
+    // {
+    if tokens.next_if(|t| matches!(t, Token::LeftBrace)).is_none() {
+        return Err(ParseError::MalformedDeclaration(
+            "no { after class declaration".to_string(),
+        ));
+    }
+    // function *
+    let mut functions = vec![];
+    while matches!(tokens.peek(), Some(Token::Fun)) {
+        functions.push(function_declaration_statement(tokens)?);
+    }
+    // }
+    if tokens.next_if(|t| matches!(t, Token::RightBrace)).is_none() {
+        return Err(ParseError::MalformedDeclaration(
+            "no } after class declaration".to_string(),
+        ));
+    }
+
+    language_error_wrap(ClassDeclarationStatement::new(
+        name.to_owned(),
+        functions,
+    ))
+}
 // grammar
 // expression -> assignment
 // assignment -> IDENTIFIER "=" assignment | logic_or

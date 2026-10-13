@@ -8,6 +8,7 @@ use std::{
 use strum::Display;
 
 use crate::{
+    class::{LoxClass, LoxInstance},
     environment::Environment,
     error::RuntimeError,
     expression::{
@@ -19,9 +20,10 @@ use crate::{
     function::LoxCallable,
     resolver::Address,
     statement::{
-        BlockStatement, ExpressionStatement, FunctionDeclarationStatement,
-        IfStatement, PrintStatement, ReturnStatement, Statement,
-        StatementVisitor, VariableDeclarationStatement, WhileStatement,
+        BlockStatement, ClassDeclarationStatement, ExpressionStatement,
+        FunctionDeclarationStatement, IfStatement, PrintStatement,
+        ReturnStatement, Statement, StatementVisitor,
+        VariableDeclarationStatement, WhileStatement,
     },
     token::Token,
 };
@@ -39,6 +41,10 @@ pub enum Value {
     #[strum(to_string = "uninitialized")]
     Uninitialized,
     Call(Rc<dyn LoxCallable>),
+    #[strum(to_string = "{0}")]
+    ClassDeclaration(LoxClass),
+    #[strum(to_string = "{0}")]
+    ClassInstance(LoxInstance),
 }
 
 impl Value {
@@ -50,10 +56,14 @@ impl Value {
         interpreter: &mut Interpreter,
         arguments: Vec<Self>,
     ) -> Result<Self, RuntimeError> {
-        let Value::Call(callee) = self else {
-            return Err(RuntimeError::NotCallable(self.to_string()));
-        };
-        callee.call(interpreter, arguments)
+        match self {
+            Value::Call(c) => c.call(interpreter, arguments),
+            Value::ClassDeclaration(c) => c.call(interpreter, arguments),
+            // Value::ClassInstance(c) => c,
+            _ => {
+                return Err(RuntimeError::NotCallable(self.to_string()));
+            }
+        }
     }
 }
 
@@ -142,8 +152,10 @@ impl TryFrom<Value> for LiteralExpression {
             Value::Uninitialized => {
                 Err(RuntimeError::UninitializedVariableUsed("?".to_owned()))
             }
-            Value::Call(_) => {
-                todo!("value call to literal expression")
+            Value::Call(_)
+            | Value::ClassInstance(_)
+            | Value::ClassDeclaration(_) => {
+                todo!("value call and classes to literal expression")
             }
         }
     }
@@ -511,6 +523,15 @@ impl StatementVisitor<Result<Value, RuntimeError>> for Interpreter {
             .transpose()?
             .unwrap_or(Value::Nil);
         Err(RuntimeError::Return(value))
+    }
+    fn visit_class(
+        &mut self,
+        statement: Rc<ClassDeclarationStatement>,
+    ) -> Result<Value, RuntimeError> {
+        self.environment.define(statement.name.clone(), Value::Nil);
+        let class = Value::ClassDeclaration(LoxClass::new(statement.clone()));
+        self.environment.assign(&statement.name, class)?;
+        Ok(Value::Nil)
     }
 }
 

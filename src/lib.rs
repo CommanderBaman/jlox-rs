@@ -1,3 +1,4 @@
+mod class;
 mod cli;
 mod environment;
 mod error;

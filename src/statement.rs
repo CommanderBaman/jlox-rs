@@ -20,8 +20,9 @@ use crate::{
 // I will keep the Statement enum as is
 //
 // grammar
-// program   -> statement* EOF
-// declaration -> functionDeclaration | variableDeclaration | statement
+// program   -> declaration* EOF
+// declaration -> functionDeclaration | variableDeclaration
+//                  | classDeclaration | statement
 // statement -> exprStmt | printStmt | blockStmt | ifStmt
 //              | whileStmt | forStmt | returnStmt
 // exprStmt  -> expression ";"
@@ -36,6 +37,7 @@ use crate::{
 // function -> IDENTIFIER "(" parameters? ")" blockStmt
 // parameters -> IDENTIFIER ( "," IDENTIFIER )*
 // returnStmt -> "return" expression? ";"
+// classDeclaration ->  "class" IDENTIFIER "{" function* "}"
 //
 // NOTE: forStmt is syntactic sugar for whileStmt
 #[derive(Debug, Display, Clone)]
@@ -52,6 +54,7 @@ pub enum Statement {
     While(Rc<WhileStatement>),
     Function(Rc<FunctionDeclarationStatement>),
     Return(Rc<ReturnStatement>),
+    Class(Rc<ClassDeclarationStatement>),
 }
 
 pub trait StatementVisitor<R> {
@@ -72,6 +75,7 @@ pub trait StatementVisitor<R> {
         statement: Rc<FunctionDeclarationStatement>,
     ) -> R;
     fn visit_return(&mut self, statement: Rc<ReturnStatement>) -> R;
+    fn visit_class(&mut self, statement: Rc<ClassDeclarationStatement>) -> R;
 }
 
 impl Statement {
@@ -90,6 +94,7 @@ impl Statement {
             Statement::While(s) => visitor.visit_while(s.clone()),
             Statement::Function(s) => visitor.visit_function(s.clone()),
             Statement::Return(s) => visitor.visit_return(s.clone()),
+            Statement::Class(s) => visitor.visit_class(s.clone()),
         }
     }
 }
@@ -233,5 +238,32 @@ pub struct ReturnStatement {
 impl ReturnStatement {
     pub fn new(value: Option<Expression>) -> Statement {
         Statement::Return(Rc::new(Self { value }))
+    }
+}
+
+// classDeclaration ->  "class" IDENTIFIER "{" function* "}"
+#[derive(Debug, Clone)]
+pub struct ClassDeclarationStatement {
+    pub name: VariableToken,
+    pub functions: Vec<Rc<FunctionDeclarationStatement>>,
+}
+
+impl ClassDeclarationStatement {
+    pub fn new(
+        name: Token,
+        functions: Vec<Statement>,
+    ) -> Result<Statement, LanguageError> {
+        let name = name.try_into()?;
+        let functions = functions
+            .into_iter()
+            .map(|stmt| match stmt {
+                Statement::Function(f) => Ok(f),
+                _ => Err(LanguageError::IncorrectStatementConversion {
+                    base_statement: stmt,
+                    converted_to: "FunctionDeclarationStatement",
+                }),
+            })
+            .collect::<Result<Vec<Rc<FunctionDeclarationStatement>>, LanguageError>>()?;
+        Ok(Statement::Class(Rc::new(Self { name, functions })))
     }
 }

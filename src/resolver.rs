@@ -352,4 +352,12 @@ impl StatementVisitor<Result<(), ResolverError>> for Resolver<'_> {
         self.resolve_expression(&statement.condition)?;
         self.resolve_statement(statement.body.clone())
     }
+    fn visit_class(
+        &mut self,
+        statement: Rc<statement::ClassDeclarationStatement>,
+    ) -> Result<(), ResolverError> {
+        self.declare(statement.name.clone())?;
+        self.define(statement.name.clone())?;
+        Ok(())
+    }
 }
