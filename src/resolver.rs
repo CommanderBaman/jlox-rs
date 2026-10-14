@@ -25,11 +25,15 @@ impl Address for expression::VariableExpression {}
 impl Address for expression::AssignmentExpression {}
 impl Address for expression::ThisExpression {}
 
-#[derive(Clone)]
 enum FunctionKind {
     None,
     Function,
     Method,
+}
+
+enum ClassKind {
+    None,
+    Class,
 }
 
 enum VariableState {
@@ -77,6 +81,7 @@ pub struct Resolver<'a> {
     resolves: HashMap<usize, usize>,
     interpreter: &'a mut Interpreter,
     current_function: FunctionKind,
+    current_class: ClassKind,
 }
 
 impl<'a> Resolver<'a> {
@@ -86,6 +91,7 @@ impl<'a> Resolver<'a> {
             resolves: HashMap::new(),
             interpreter,
             current_function: FunctionKind::None,
+            current_class: ClassKind::None,
         }
     }
     pub fn resolve(
@@ -299,6 +305,9 @@ impl ExpressionVisitor<Result<(), ResolverError>> for Resolver<'_> {
         &mut self,
         expression: &expression::ThisExpression,
     ) -> Result<(), ResolverError> {
+        if !matches!(self.current_class, ClassKind::Class) {
+            return Err(ResolverError::InvalidThis);
+        }
         self.resolve_local(expression, &expression.token);
         Ok(())
     }
@@ -382,6 +391,8 @@ impl StatementVisitor<Result<(), ResolverError>> for Resolver<'_> {
         &mut self,
         statement: Rc<statement::ClassDeclarationStatement>,
     ) -> Result<(), ResolverError> {
+        let enclosing_class =
+            mem::replace(&mut self.current_class, ClassKind::Class);
         self.declare(statement.name.clone())?;
         self.define(statement.name.clone())?;
         self.begin_scope();
@@ -391,6 +402,7 @@ impl StatementVisitor<Result<(), ResolverError>> for Resolver<'_> {
             self.resolve_function(function, FunctionKind::Method)?;
         }
         self.end_scope()?;
+        self.current_class = enclosing_class;
         Ok(())
     }
 }

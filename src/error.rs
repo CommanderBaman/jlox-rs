@@ -27,6 +27,8 @@ pub enum ResolverError {
     UnusedVariables(Vec<VariableToken>),
     #[error("unknown: {0}")]
     Unknown(String),
+    #[error("invalid usage of this")]
+    InvalidThis,
 }
 
 #[derive(Error, Debug)]
