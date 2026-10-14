@@ -1,12 +1,49 @@
-use std::{collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
     error::RuntimeError,
     expression::VariableToken,
     function::{LoxCallable, LoxFunction},
-    interpreter::{self, Value},
-    statement::ClassDeclarationStatement,
+    interpreter::{Interpreter, Value},
+    statement::{ClassDeclarationStatement, FunctionDeclarationStatement},
 };
+
+#[derive(Debug, Clone)]
+pub struct LoxClassFunction {
+    declaration: Rc<FunctionDeclarationStatement>,
+    instance: Value,
+}
+
+impl LoxClassFunction {
+    fn new(
+        declaration: Rc<FunctionDeclarationStatement>,
+        instance: Value,
+    ) -> Self {
+        Self {
+            declaration,
+            instance,
+        }
+    }
+}
+
+impl LoxCallable for LoxClassFunction {
+    fn arity(&self) -> usize {
+        self.declaration.arity()
+    }
+    fn call(
+        &self,
+        interpreter: &mut Interpreter,
+        arguments: Vec<Value>,
+    ) -> Result<Value, RuntimeError> {
+        interpreter.environment.push_child();
+        interpreter
+            .environment
+            .define(VariableToken::This, self.instance.clone());
+        let value = self.declaration.call(interpreter, arguments);
+        interpreter.environment.pop_child()?;
+        value
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct LoxClass {
@@ -40,12 +77,12 @@ impl LoxCallable for LoxClass {
     }
     fn call(
         &self,
-        _interpreter: &mut interpreter::Interpreter,
-        _arguments: Vec<interpreter::Value>,
-    ) -> Result<interpreter::Value, RuntimeError> {
-        Ok(interpreter::Value::ClassInstance(LoxInstance::new(
-            self.clone(),
-        )))
+        _interpreter: &mut Interpreter,
+        _arguments: Vec<Value>,
+    ) -> Result<Value, RuntimeError> {
+        Ok(Value::ClassInstance(Rc::new(RefCell::new(
+            LoxInstance::new(self.clone()),
+        ))))
     }
 }
 
@@ -63,11 +100,22 @@ impl LoxInstance {
         }
     }
     // I really want to use an option here
-    pub fn get(&self, property: &VariableToken) -> Result<Value, RuntimeError> {
+    pub fn get(
+        &self,
+        property: &VariableToken,
+        this_value: Value,
+    ) -> Result<Value, RuntimeError> {
         self.fields
             .get(property)
             .cloned()
-            .or_else(|| self.class.get_method(property).map(|f| Value::Call(f)))
+            .or_else(|| {
+                self.class.get_method(property).map(|f| {
+                    let call = Value::Call(Rc::new(LoxClassFunction::new(
+                        f, this_value,
+                    )));
+                    call
+                })
+            })
             .ok_or(RuntimeError::PropertyNotFound(
                 property.clone(),
                 self.to_string(),

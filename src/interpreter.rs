@@ -1,4 +1,5 @@
 use std::{
+    cell::RefCell,
     cmp::Ordering,
     collections::HashMap,
     ops::{Add, Div, Mul, Sub},
@@ -15,7 +16,8 @@ use crate::{
         AssignmentExpression, BinaryExpression, BinaryOperator, CallExpression,
         Expression, ExpressionVisitor, GetExpression, GroupingExpression,
         LiteralExpression, LiteralToken, LogicalExpression, LogicalOperator,
-        SetExpression, UnaryExpression, UnaryOperator, VariableExpression,
+        SetExpression, ThisExpression, UnaryExpression, UnaryOperator,
+        VariableExpression,
     },
     function::LoxCallable,
     resolver::Address,
@@ -42,9 +44,8 @@ pub enum Value {
     Uninitialized,
     Call(Rc<dyn LoxCallable>),
     #[strum(to_string = "{0}")]
-    ClassDeclaration(LoxClass),
-    #[strum(to_string = "{0}")]
-    ClassInstance(LoxInstance),
+    ClassDeclaration(Rc<LoxClass>),
+    ClassInstance(Rc<RefCell<LoxInstance>>),
 }
 
 impl Value {
@@ -439,22 +440,36 @@ impl ExpressionVisitor<Result<Value, RuntimeError>> for Interpreter {
         expression: &GetExpression,
     ) -> Result<Value, RuntimeError> {
         let callee = self.evaluate(&expression.callee)?;
-        let Value::ClassInstance(object) = callee else {
+        let Value::ClassInstance(object) = &callee else {
             return Err(RuntimeError::NoProperties(callee));
         };
-        object.get(&expression.property)
+        object.borrow().get(&expression.property, callee.clone())
     }
     fn visit_set(
         &mut self,
         expression: &SetExpression,
     ) -> Result<Value, RuntimeError> {
         let callee = self.evaluate(&expression.callee)?;
-        let Value::ClassInstance(mut object) = callee else {
+        let Value::ClassInstance(object) = callee else {
             return Err(RuntimeError::NotSettable(callee.to_string()));
         };
         let value = self.evaluate(&expression.value)?;
-        object.set(expression.property.clone(), value.clone());
+        object
+            .borrow_mut()
+            .set(expression.property.clone(), value.clone());
         Ok(value)
+    }
+    fn visit_this(
+        &mut self,
+        expression: &ThisExpression,
+    ) -> Result<Value, RuntimeError> {
+        let addr = expression.addr();
+        self.environment
+            .lookup(&expression.token, self.locals.get(&addr).cloned())
+            .cloned()
+            .ok_or_else(|| {
+                RuntimeError::VariableNotFound(expression.token.to_string())
+            })
     }
 }
 
@@ -551,7 +566,8 @@ impl StatementVisitor<Result<Value, RuntimeError>> for Interpreter {
         statement: Rc<ClassDeclarationStatement>,
     ) -> Result<Value, RuntimeError> {
         self.environment.define(statement.name.clone(), Value::Nil);
-        let class = Value::ClassDeclaration(LoxClass::new(statement.clone()));
+        let class =
+            Value::ClassDeclaration(Rc::new(LoxClass::new(statement.clone())));
         self.environment.assign(&statement.name, class)?;
         Ok(Value::Nil)
     }

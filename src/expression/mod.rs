@@ -7,7 +7,7 @@ pub mod print;
 
 // Grammar
 // expression -> literal | unary | binary | grouping
-//              | variable | assignment | logical | call
+//              | variable | assignment | logical | call | this
 #[derive(Clone, Debug, Display)]
 pub enum Expression {
     #[strum(to_string = "LiteralExpr({0})")]
@@ -26,6 +26,7 @@ pub enum Expression {
     Get(GetExpression),
     #[strum(to_string = "SetExpr({0})")]
     Set(SetExpression),
+    This(ThisExpression),
 }
 
 // NOTE: we require mutable expression where ever we might need to evaluate
@@ -41,6 +42,7 @@ pub trait ExpressionVisitor<R> {
     fn visit_call(&mut self, expression: &CallExpression) -> R;
     fn visit_get(&mut self, expression: &GetExpression) -> R;
     fn visit_set(&mut self, expression: &SetExpression) -> R;
+    fn visit_this(&mut self, expression: &ThisExpression) -> R;
 }
 
 impl Expression {
@@ -56,11 +58,12 @@ impl Expression {
             Expression::Call(l) => visitor.visit_call(l),
             Expression::Get(l) => visitor.visit_get(l),
             Expression::Set(l) => visitor.visit_set(l),
+            Expression::This(l) => visitor.visit_this(l),
         }
     }
 }
 
-// literal        → NUMBER | STRING | "true" | "false" | "nil"
+// literal        → NUMBER | STRING | "true" | "false" | "nil" | this
 #[derive(Clone, Debug, Display)]
 pub enum LiteralToken {
     #[strum(to_string = "Number({0})")]
@@ -295,12 +298,14 @@ impl std::fmt::Display for LogicalExpression {
 pub enum VariableToken {
     #[strum(to_string = "{0}")]
     Identifier(String),
+    This,
 }
 impl TryFrom<Token> for VariableToken {
     type Error = LanguageError;
     fn try_from(token: Token) -> Result<Self, Self::Error> {
         match token {
             Token::Identifier(i) => Ok(VariableToken::Identifier(i)),
+            Token::This => Ok(VariableToken::This),
             _ => Err(LanguageError::IncorrectTokenConversion {
                 base_token: token,
                 converted_to: "VariableToken",
@@ -435,5 +440,26 @@ impl SetExpression {
 impl std::fmt::Display for SetExpression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}.{} = {}", self.callee, self.property, self.value)
+    }
+}
+
+// this -> "this"
+#[derive(Clone, Debug)]
+pub struct ThisExpression {
+    pub token: VariableToken,
+}
+impl ThisExpression {
+    pub fn wrap(self) -> Expression {
+        Expression::This(self)
+    }
+    pub fn new(token: Token) -> Result<Expression, LanguageError> {
+        let this_token = token.clone().try_into()?;
+        if !matches!(this_token, VariableToken::This) {
+            return Err(LanguageError::IncorrectTokenConversion {
+                base_token: token,
+                converted_to: "ThisToken",
+            });
+        }
+        Ok(Expression::This(Self { token: this_token }))
     }
 }

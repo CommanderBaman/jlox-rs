@@ -23,6 +23,7 @@ pub trait Address {
 }
 impl Address for expression::VariableExpression {}
 impl Address for expression::AssignmentExpression {}
+impl Address for expression::ThisExpression {}
 
 #[derive(Clone)]
 enum FunctionKind {
@@ -118,6 +119,9 @@ impl<'a> Resolver<'a> {
                 .into_iter()
                 // could use filter map but this is better
                 .filter(|(_, state)| !matches!(state, VariableState::Used))
+                .filter(|(variable, _)| {
+                    !matches!(variable, VariableToken::This)
+                })
                 .map(|(variable, _)| variable)
                 .collect();
             if !unused_elements.is_empty() {
@@ -291,6 +295,13 @@ impl ExpressionVisitor<Result<(), ResolverError>> for Resolver<'_> {
         self.resolve_expression(&expression.callee)?;
         Ok(())
     }
+    fn visit_this(
+        &mut self,
+        expression: &expression::ThisExpression,
+    ) -> Result<(), ResolverError> {
+        self.resolve_local(expression, &expression.token);
+        Ok(())
+    }
 }
 
 impl StatementVisitor<Result<(), ResolverError>> for Resolver<'_> {
@@ -373,9 +384,13 @@ impl StatementVisitor<Result<(), ResolverError>> for Resolver<'_> {
     ) -> Result<(), ResolverError> {
         self.declare(statement.name.clone())?;
         self.define(statement.name.clone())?;
+        self.begin_scope();
+        self.declare(VariableToken::This)?;
+        self.define(VariableToken::This)?;
         for function in statement.functions.clone() {
             self.resolve_function(function, FunctionKind::Method)?;
         }
+        self.end_scope()?;
         Ok(())
     }
 }

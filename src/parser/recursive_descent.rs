@@ -5,7 +5,8 @@ use crate::{
     expression::{
         AssignmentExpression, BinaryExpression, CallExpression, Expression,
         GetExpression, GroupingExpression, LiteralExpression,
-        LogicalExpression, SetExpression, UnaryExpression, VariableExpression,
+        LogicalExpression, SetExpression, ThisExpression, UnaryExpression,
+        VariableExpression,
     },
     statement::{
         BlockStatement, ClassDeclarationStatement, ExpressionStatement,
@@ -481,7 +482,7 @@ fn class_declaration_statement(
 // call       -> primary ( "(" arguments? ")" | "." IDENTIFIER )*
 // arguments  -> expression ( "," expression )*
 // primary    -> NUMBER | STRING | "true" | "false" | "nil"
-//              | "(" expression ")" | IDENTIFIER
+//              | "(" expression ")" | IDENTIFIER | "this"
 pub(super) fn parse_expression(
     tokens: &Vec<Token>,
 ) -> Result<Expression, LanguageError> {
@@ -799,7 +800,7 @@ fn arguments(
 }
 
 // primary → NUMBER | STRING | "true" | "false" | "nil"
-//          | "(" expression ")" | IDENTIFIER
+//          | "(" expression ")" | IDENTIFIER | "this"
 fn primary(
     tokens: &mut Peekable<Iter<Token>>,
 ) -> Result<Expression, ParseError> {
@@ -813,6 +814,9 @@ fn primary(
         | Token::Number(_)
         | Token::String(_) => {
             language_error_wrap(LiteralExpression::new(token.to_owned()))
+        }
+        Token::This => {
+            language_error_wrap(ThisExpression::new(token.to_owned()))
         }
         Token::LeftParen => {
             let expression = expression(tokens)?;
