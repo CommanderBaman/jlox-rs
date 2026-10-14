@@ -15,7 +15,7 @@ use crate::{
         AssignmentExpression, BinaryExpression, BinaryOperator, CallExpression,
         Expression, ExpressionVisitor, GetExpression, GroupingExpression,
         LiteralExpression, LiteralToken, LogicalExpression, LogicalOperator,
-        UnaryExpression, UnaryOperator, VariableExpression,
+        SetExpression, UnaryExpression, UnaryOperator, VariableExpression,
     },
     function::LoxCallable,
     resolver::Address,
@@ -443,6 +443,18 @@ impl ExpressionVisitor<Result<Value, RuntimeError>> for Interpreter {
             return Err(RuntimeError::NoProperties(callee));
         };
         object.get(&expression.property)
+    }
+    fn visit_set(
+        &mut self,
+        expression: &SetExpression,
+    ) -> Result<Value, RuntimeError> {
+        let callee = self.evaluate(&expression.callee)?;
+        let Value::ClassInstance(mut object) = callee else {
+            return Err(RuntimeError::NotSettable(callee.to_string()));
+        };
+        let value = self.evaluate(&expression.value)?;
+        object.set(expression.property.clone(), value.clone());
+        Ok(value)
     }
 }
 

@@ -58,10 +58,12 @@ pub enum RuntimeError {
     IllegalTime(#[from] SystemTimeError),
     #[error("return called from somewhere unknown")]
     Return(Value),
-    #[error("no properties other than instance: {0}")]
+    #[error("no properties on types other than instance: {0}")]
     NoProperties(Value),
     #[error("no property named {0} on instance: {1}")]
     PropertyNotFound(VariableToken, String),
+    #[error("can not set properties on instance: {0}")]
+    NotSettable(String),
 }
 
 #[derive(Error, Debug)]

@@ -2,7 +2,7 @@
 
 use crate::expression::{
     AssignmentExpression, CallExpression, Expression, ExpressionVisitor,
-    GetExpression, LogicalExpression, VariableExpression,
+    GetExpression, LogicalExpression, SetExpression, VariableExpression,
 };
 
 pub struct SimpleAstPrinter {}
@@ -66,6 +66,9 @@ impl ExpressionVisitor<String> for SimpleAstPrinter {
         unimplemented!()
     }
     fn visit_get(&mut self, _expression: &GetExpression) -> String {
+        unimplemented!()
+    }
+    fn visit_set(&mut self, _expression: &SetExpression) -> String {
         unimplemented!()
     }
 }

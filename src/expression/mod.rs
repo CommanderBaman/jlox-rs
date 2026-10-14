@@ -16,11 +16,16 @@ pub enum Expression {
     Unary(UnaryExpression),
     #[strum(to_string = "BinaryExpr({0})")]
     Binary(BinaryExpression),
+    #[strum(to_string = "VariableExpr({0})")]
     Variable(VariableExpression),
     Assignment(AssignmentExpression),
     Logical(LogicalExpression),
+    #[strum(to_string = "CallExpr({0})")]
     Call(CallExpression),
+    #[strum(to_string = "GetExpr({0})")]
     Get(GetExpression),
+    #[strum(to_string = "SetExpr({0})")]
+    Set(SetExpression),
 }
 
 // NOTE: we require mutable expression where ever we might need to evaluate
@@ -35,6 +40,7 @@ pub trait ExpressionVisitor<R> {
     fn visit_logical(&mut self, expression: &LogicalExpression) -> R;
     fn visit_call(&mut self, expression: &CallExpression) -> R;
     fn visit_get(&mut self, expression: &GetExpression) -> R;
+    fn visit_set(&mut self, expression: &SetExpression) -> R;
 }
 
 impl Expression {
@@ -49,6 +55,7 @@ impl Expression {
             Expression::Logical(l) => visitor.visit_logical(l),
             Expression::Call(l) => visitor.visit_call(l),
             Expression::Get(l) => visitor.visit_get(l),
+            Expression::Set(l) => visitor.visit_set(l),
         }
     }
 }
@@ -286,7 +293,7 @@ impl std::fmt::Display for LogicalExpression {
 // variable -> IDENTIFIER
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, PartialOrd)]
 pub enum VariableToken {
-    #[strum(to_string = "Identifier({0})")]
+    #[strum(to_string = "{0}")]
     Identifier(String),
 }
 impl TryFrom<Token> for VariableToken {
@@ -368,6 +375,11 @@ impl CallExpression {
         })
     }
 }
+impl std::fmt::Display for CallExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}({:?})", self.callee, self.arguments)
+    }
+}
 
 // getExpr -> ( "." IDENTIFIER )*
 #[derive(Clone, Debug)]
@@ -388,5 +400,40 @@ impl GetExpression {
             callee: Rc::new(callee),
             property,
         }))
+    }
+}
+
+impl std::fmt::Display for GetExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}.{}", self.callee, self.property)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct SetExpression {
+    pub callee: Rc<Expression>,
+    pub property: VariableToken,
+    pub value: Rc<Expression>,
+}
+impl SetExpression {
+    pub fn wrap(self) -> Expression {
+        Expression::Set(self)
+    }
+    pub fn from(
+        callee: Rc<Expression>,
+        property: VariableToken,
+        value: Expression,
+    ) -> Expression {
+        Expression::Set(Self {
+            callee,
+            property,
+            value: Rc::new(value),
+        })
+    }
+}
+
+impl std::fmt::Display for SetExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}.{} = {}", self.callee, self.property, self.value)
     }
 }

@@ -28,6 +28,7 @@ impl Address for expression::AssignmentExpression {}
 enum FunctionKind {
     None,
     Function,
+    Method,
 }
 
 enum VariableState {
@@ -282,6 +283,14 @@ impl ExpressionVisitor<Result<(), ResolverError>> for Resolver<'_> {
     ) -> Result<(), ResolverError> {
         self.resolve_expression(&expression.callee)
     }
+    fn visit_set(
+        &mut self,
+        expression: &expression::SetExpression,
+    ) -> Result<(), ResolverError> {
+        self.resolve_expression(&expression.value)?;
+        self.resolve_expression(&expression.callee)?;
+        Ok(())
+    }
 }
 
 impl StatementVisitor<Result<(), ResolverError>> for Resolver<'_> {
@@ -364,6 +373,9 @@ impl StatementVisitor<Result<(), ResolverError>> for Resolver<'_> {
     ) -> Result<(), ResolverError> {
         self.declare(statement.name.clone())?;
         self.define(statement.name.clone())?;
+        for function in statement.functions.clone() {
+            self.resolve_function(function, FunctionKind::Method)?;
+        }
         Ok(())
     }
 }

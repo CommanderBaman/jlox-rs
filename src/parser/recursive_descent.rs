@@ -5,7 +5,7 @@ use crate::{
     expression::{
         AssignmentExpression, BinaryExpression, CallExpression, Expression,
         GetExpression, GroupingExpression, LiteralExpression,
-        LogicalExpression, UnaryExpression, VariableExpression,
+        LogicalExpression, SetExpression, UnaryExpression, VariableExpression,
     },
     statement::{
         BlockStatement, ClassDeclarationStatement, ExpressionStatement,
@@ -198,10 +198,17 @@ fn function_declaration_statement(
     tokens: &mut Peekable<Iter<Token>>,
 ) -> Result<Statement, ParseError> {
     assert_matches!(tokens.next(), Some(Token::Fun));
+    function(tokens)
+}
+
+// function -> IDENTIFIER "(" parameters ")" blockStmt
+fn function(
+    tokens: &mut Peekable<Iter<Token>>,
+) -> Result<Statement, ParseError> {
     // identifier
     if !matches!(tokens.peek(), Some(Token::Identifier(_))) {
         return Err(ParseError::MalformedDeclaration(
-            "no identifier after fun keyword".to_string(),
+            "no identifier for function declaration".to_string(),
         ));
     }
     let name = tokens.next().unwrap();
@@ -441,13 +448,13 @@ fn class_declaration_statement(
     // {
     if tokens.next_if(|t| matches!(t, Token::LeftBrace)).is_none() {
         return Err(ParseError::MalformedDeclaration(
-            "no { after class declaration".to_string(),
+            "no { after class declaration here".to_string(),
         ));
     }
     // function *
     let mut functions = vec![];
-    while matches!(tokens.peek(), Some(Token::Fun)) {
-        functions.push(function_declaration_statement(tokens)?);
+    while matches!(tokens.peek(), Some(Token::Identifier(_))) {
+        functions.push(function(tokens)?);
     }
     // }
     if tokens.next_if(|t| matches!(t, Token::RightBrace)).is_none() {
@@ -463,7 +470,7 @@ fn class_declaration_statement(
 }
 // grammar
 // expression -> assignment
-// assignment -> IDENTIFIER "=" assignment | logic_or
+// assignment -> ( call "." )? IDENTIFIER "=" assignment | logic_or
 // logic_or   -> logic_and ( "or" logic_and )*
 // logic_and  -> equality ( "and" equality )*
 // equality   -> comparison ( ( "!=" | "==" ) comparison )*
@@ -525,7 +532,7 @@ fn expression(
     assignment(tokens)
 }
 
-// assignment -> IDENTIFIER "=" assignment | logic_or
+// assignment -> (call ".")? IDENTIFIER "=" assignment | logic_or
 fn assignment(
     tokens: &mut Peekable<Iter<Token>>,
 ) -> Result<Expression, ParseError> {
@@ -538,6 +545,9 @@ fn assignment(
         match expr {
             Expression::Variable(v) => {
                 return Ok(AssignmentExpression::from(v.variable, value));
+            }
+            Expression::Get(g) => {
+                return Ok(SetExpression::from(g.callee, g.property, value));
             }
             _ => {
                 return Err(ParseError::InvalidAssignment(expr));
@@ -732,7 +742,7 @@ fn call(tokens: &mut Peekable<Iter<Token>>) -> Result<Expression, ParseError> {
                 if matches!(tokens.peek(), Some(Token::RightParen)) {
                     assert_matches!(tokens.next(), Some(Token::RightParen));
                     expr = CallExpression::new(expr, vec![]);
-                    break;
+                    continue;
                 }
 
                 let arguments = arguments(tokens)?;
@@ -749,7 +759,7 @@ fn call(tokens: &mut Peekable<Iter<Token>>) -> Result<Expression, ParseError> {
                 }
                 assert_matches!(tokens.next(), Some(Token::RightParen));
             }
-            // getExpr -> ( "." IDENTIFIER )*
+            // getExpr -> "." IDENTIFIER
             Some(Token::Dot) => {
                 assert_matches!(tokens.next(), Some(Token::Dot));
                 call_string = call_string + Token::Dot.to_string().as_str();

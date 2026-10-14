@@ -11,6 +11,8 @@ use crate::{
     statement::{FunctionDeclarationStatement, StatementVisitor},
 };
 
+pub type LoxFunction = FunctionDeclarationStatement;
+
 pub trait LoxCallable {
     fn arity(&self) -> usize;
     fn call(
