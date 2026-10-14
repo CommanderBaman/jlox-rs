@@ -4,8 +4,8 @@ use crate::{
     error::{LanguageError, ParseError},
     expression::{
         AssignmentExpression, BinaryExpression, CallExpression, Expression,
-        GroupingExpression, LiteralExpression, LogicalExpression,
-        UnaryExpression, VariableExpression,
+        GetExpression, GroupingExpression, LiteralExpression,
+        LogicalExpression, UnaryExpression, VariableExpression,
     },
     statement::{
         BlockStatement, ClassDeclarationStatement, ExpressionStatement,
@@ -471,7 +471,7 @@ fn class_declaration_statement(
 // term       -> factor ( ( "-" | "+" ) factor )*
 // factor     -> unary ( ( "/" | "*" ) unary )*
 // unary      -> ( "!" | "-" ) unary | call
-// call       -> primary ( "(" arguments? ")" )*
+// call       -> primary ( "(" arguments? ")" | "." IDENTIFIER )*
 // arguments  -> expression ( "," expression )*
 // primary    -> NUMBER | STRING | "true" | "false" | "nil"
 //              | "(" expression ")" | IDENTIFIER
@@ -715,37 +715,59 @@ fn unary(tokens: &mut Peekable<Iter<Token>>) -> Result<Expression, ParseError> {
     }
 }
 
-// call -> primary ( "(" arguments? ")" )*
+// call -> primary ( "(" arguments? ")" | "." IDENTIFIER )*
 fn call(tokens: &mut Peekable<Iter<Token>>) -> Result<Expression, ParseError> {
     let mut expr = primary(tokens)?;
     let mut call_string = String::new();
 
-    while matches!(tokens.peek(), Some(Token::LeftParen)) {
-        assert_matches!(tokens.next(), Some(Token::LeftParen));
-        call_string = call_string + Token::LeftParen.to_string().as_str();
+    loop {
+        match tokens.peek() {
+            // callExpr -> "(" arguments? ")"
+            Some(Token::LeftParen) => {
+                assert_matches!(tokens.next(), Some(Token::LeftParen));
+                call_string =
+                    call_string + Token::LeftParen.to_string().as_str();
 
-        // if no arguments
-        if matches!(tokens.peek(), Some(Token::RightParen)) {
-            assert_matches!(tokens.next(), Some(Token::RightParen));
-            expr = CallExpression::new(expr, vec![]);
-            break;
+                // if no arguments
+                if matches!(tokens.peek(), Some(Token::RightParen)) {
+                    assert_matches!(tokens.next(), Some(Token::RightParen));
+                    expr = CallExpression::new(expr, vec![]);
+                    break;
+                }
+
+                let arguments = arguments(tokens)?;
+                expr = CallExpression::new(expr, arguments);
+
+                if !matches!(tokens.peek(), Some(Token::RightParen)) {
+                    call_string = call_string
+                        + " ... "
+                        + &tokens
+                            .peek()
+                            .map(|t| t.to_string())
+                            .unwrap_or(String::from("?"));
+                    return Err(ParseError::UnterminatedCall(call_string));
+                }
+                assert_matches!(tokens.next(), Some(Token::RightParen));
+            }
+            // getExpr -> ( "." IDENTIFIER )*
+            Some(Token::Dot) => {
+                assert_matches!(tokens.next(), Some(Token::Dot));
+                call_string = call_string + Token::Dot.to_string().as_str();
+
+                if !matches!(tokens.peek(), Some(Token::Identifier(_))) {
+                    return Err(ParseError::MalformedGet(call_string));
+                }
+                let property = tokens.next().unwrap();
+                expr = language_error_wrap(GetExpression::new(
+                    expr,
+                    property.clone(),
+                ))?;
+            }
+            _ => {
+                break;
+            }
         }
-
-        let arguments = arguments(tokens)?;
-        expr = CallExpression::new(expr, arguments);
-
-        if !matches!(tokens.peek(), Some(Token::RightParen)) {
-            call_string = call_string
-                + " ... "
-                + &tokens
-                    .peek()
-                    .map(|t| t.to_string())
-                    .unwrap_or(String::from("?"));
-            return Err(ParseError::UnterminatedCall(call_string));
-        }
-        assert_matches!(tokens.next(), Some(Token::RightParen));
     }
-
     Ok(expr)
 }
 

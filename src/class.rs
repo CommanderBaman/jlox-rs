@@ -1,7 +1,10 @@
-use std::rc::Rc;
+use std::{collections::HashMap, rc::Rc};
 
 use crate::{
-    error::RuntimeError, function::LoxCallable, interpreter,
+    error::RuntimeError,
+    expression::VariableToken,
+    function::LoxCallable,
+    interpreter::{self, Value},
     statement::ClassDeclarationStatement,
 };
 
@@ -38,11 +41,25 @@ impl LoxCallable for LoxClass {
 #[derive(Debug, Clone)]
 pub struct LoxInstance {
     class: LoxClass,
+    fields: HashMap<VariableToken, Value>,
 }
 
 impl LoxInstance {
     pub fn new(class: LoxClass) -> Self {
-        Self { class }
+        Self {
+            class,
+            fields: HashMap::new(),
+        }
+    }
+    // I really want to use an option here
+    pub fn get(&self, property: &VariableToken) -> Result<Value, RuntimeError> {
+        self.fields
+            .get(property)
+            .ok_or(RuntimeError::PropertyNotFound(
+                property.clone(),
+                self.to_string(),
+            ))
+            .cloned()
     }
 }
 impl std::fmt::Display for LoxInstance {

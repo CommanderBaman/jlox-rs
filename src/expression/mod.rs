@@ -20,6 +20,7 @@ pub enum Expression {
     Assignment(AssignmentExpression),
     Logical(LogicalExpression),
     Call(CallExpression),
+    Get(GetExpression),
 }
 
 // NOTE: we require mutable expression where ever we might need to evaluate
@@ -33,6 +34,7 @@ pub trait ExpressionVisitor<R> {
     fn visit_assignment(&mut self, expression: &AssignmentExpression) -> R;
     fn visit_logical(&mut self, expression: &LogicalExpression) -> R;
     fn visit_call(&mut self, expression: &CallExpression) -> R;
+    fn visit_get(&mut self, expression: &GetExpression) -> R;
 }
 
 impl Expression {
@@ -46,6 +48,7 @@ impl Expression {
             Expression::Assignment(l) => visitor.visit_assignment(l),
             Expression::Logical(l) => visitor.visit_logical(l),
             Expression::Call(l) => visitor.visit_call(l),
+            Expression::Get(l) => visitor.visit_get(l),
         }
     }
 }
@@ -347,7 +350,8 @@ impl std::fmt::Display for AssignmentExpression {
     }
 }
 
-// call -> primary ( "(" arguments? ")" )*
+// call -> primary (callExpr | getExpr)*
+// callExpr -> "(" arguments? ")"
 #[derive(Clone, Debug)]
 pub struct CallExpression {
     pub callee: Rc<Expression>,
@@ -362,5 +366,27 @@ impl CallExpression {
             callee: Rc::new(callee),
             arguments,
         })
+    }
+}
+
+// getExpr -> ( "." IDENTIFIER )*
+#[derive(Clone, Debug)]
+pub struct GetExpression {
+    pub callee: Rc<Expression>,
+    pub property: VariableToken,
+}
+impl GetExpression {
+    pub fn wrap(self) -> Expression {
+        Expression::Get(self)
+    }
+    pub fn new(
+        callee: Expression,
+        property: Token,
+    ) -> Result<Expression, LanguageError> {
+        let property = property.try_into()?;
+        Ok(Expression::Get(Self {
+            callee: Rc::new(callee),
+            property,
+        }))
     }
 }

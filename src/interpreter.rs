@@ -13,9 +13,9 @@ use crate::{
     error::RuntimeError,
     expression::{
         AssignmentExpression, BinaryExpression, BinaryOperator, CallExpression,
-        Expression, ExpressionVisitor, GroupingExpression, LiteralExpression,
-        LiteralToken, LogicalExpression, LogicalOperator, UnaryExpression,
-        UnaryOperator, VariableExpression,
+        Expression, ExpressionVisitor, GetExpression, GroupingExpression,
+        LiteralExpression, LiteralToken, LogicalExpression, LogicalOperator,
+        UnaryExpression, UnaryOperator, VariableExpression,
     },
     function::LoxCallable,
     resolver::Address,
@@ -433,6 +433,16 @@ impl ExpressionVisitor<Result<Value, RuntimeError>> for Interpreter {
             .map(|arg| self.evaluate(arg))
             .collect::<Result<Vec<Value>, RuntimeError>>()?;
         callee.call(self, arguments)
+    }
+    fn visit_get(
+        &mut self,
+        expression: &GetExpression,
+    ) -> Result<Value, RuntimeError> {
+        let callee = self.evaluate(&expression.callee)?;
+        let Value::ClassInstance(object) = callee else {
+            return Err(RuntimeError::NoProperties(callee));
+        };
+        object.get(&expression.property)
     }
 }
 

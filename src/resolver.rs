@@ -276,6 +276,12 @@ impl ExpressionVisitor<Result<(), ResolverError>> for Resolver<'_> {
     ) -> Result<(), ResolverError> {
         self.resolve_expression(&expression.expression)
     }
+    fn visit_get(
+        &mut self,
+        expression: &expression::GetExpression,
+    ) -> Result<(), ResolverError> {
+        self.resolve_expression(&expression.callee)
+    }
 }
 
 impl StatementVisitor<Result<(), ResolverError>> for Resolver<'_> {

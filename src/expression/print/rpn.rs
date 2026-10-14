@@ -2,7 +2,7 @@
 
 use crate::expression::{
     AssignmentExpression, CallExpression, Expression, ExpressionVisitor,
-    LogicalExpression, VariableExpression,
+    GetExpression, LogicalExpression, VariableExpression,
 };
 
 pub struct RpnPrinter {}
@@ -63,6 +63,9 @@ impl ExpressionVisitor<String> for RpnPrinter {
         unimplemented!()
     }
     fn visit_call(&mut self, _expression: &CallExpression) -> String {
+        unimplemented!()
+    }
+    fn visit_get(&mut self, _expression: &GetExpression) -> String {
         unimplemented!()
     }
 }

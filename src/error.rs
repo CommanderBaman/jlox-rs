@@ -58,6 +58,10 @@ pub enum RuntimeError {
     IllegalTime(#[from] SystemTimeError),
     #[error("return called from somewhere unknown")]
     Return(Value),
+    #[error("no properties other than instance: {0}")]
+    NoProperties(Value),
+    #[error("no property named {0} on instance: {1}")]
+    PropertyNotFound(VariableToken, String),
 }
 
 #[derive(Error, Debug)]
@@ -94,6 +98,8 @@ pub enum ParseError {
     TooManyArguments,
     #[error("malformed declaration: {0}")]
     MalformedDeclaration(String),
+    #[error("get expression does not contain identifier: {0}")]
+    MalformedGet(String),
 }
 
 #[derive(Error, Debug)]
