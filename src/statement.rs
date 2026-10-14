@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use std::rc::Rc;
+use std::{fmt::Display, rc::Rc};
 
 use strum::Display;
 
@@ -156,6 +156,20 @@ impl BlockStatement {
     }
 }
 
+impl Display for BlockStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{{ {} }}",
+            self.statements
+                .iter()
+                .map(|s| s.to_string())
+                .collect::<Vec<String>>()
+                .join("; ")
+        )
+    }
+}
+
 // ifStmt -> "if" "(" expression ")" statement ( "else" statement )?
 #[derive(Debug, Clone)]
 pub struct IfStatement {
@@ -226,6 +240,22 @@ impl FunctionDeclarationStatement {
             parameters,
             body,
         })))
+    }
+}
+
+impl Display for FunctionDeclarationStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "fun {} ( {} ) {} ",
+            self.name,
+            self.parameters
+                .iter()
+                .map(|p| p.to_string())
+                .collect::<Vec<String>>()
+                .join(", "),
+            self.body
+        )
     }
 }
 

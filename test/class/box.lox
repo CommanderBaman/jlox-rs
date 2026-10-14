@@ -1,0 +1,11 @@
+class Box {}
+
+fun notMethod(argument) {
+  print "called function with " + argument;
+}
+
+var box = Box();
+box.outsideMethod = notMethod;
+box.outsideMethod("argument");
+
+print box;

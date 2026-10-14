@@ -1,12 +1,9 @@
 use std::{
-    cell::RefCell,
     cmp::Ordering,
     collections::HashMap,
     ops::{Add, Div, Mul, Sub},
     rc::Rc,
 };
-
-use strum::Display;
 
 use crate::{
     class::{LoxClass, LoxInstance},
@@ -30,22 +27,32 @@ use crate::{
     token::Token,
 };
 
-#[derive(Debug, Display, Clone)]
+#[derive(Debug, Clone)]
 pub enum Value {
-    #[strum(to_string = "{0}")]
     Bool(bool),
-    #[strum(to_string = "nil")]
     Nil,
-    #[strum(to_string = "{0}")]
     Number(f64),
-    #[strum(to_string = "{0}")]
     String(String),
-    #[strum(to_string = "uninitialized")]
     Uninitialized,
     Call(Rc<dyn LoxCallable>),
-    #[strum(to_string = "{0}")]
     ClassDeclaration(Rc<LoxClass>),
-    ClassInstance(Rc<RefCell<LoxInstance>>),
+    ClassInstance(Rc<LoxInstance>),
+}
+
+impl std::fmt::Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let string = match self {
+            Self::Bool(b) => format!("{b}"),
+            Self::Nil => format!("nil"),
+            Self::Number(n) => format!("{n}"),
+            Self::String(s) => format!("{s}"),
+            Self::Uninitialized => format!("uinitialized"),
+            Self::Call(c) => format!("{c}"),
+            Self::ClassDeclaration(c) => format!("{c}"),
+            Self::ClassInstance(c) => format!("{c}"),
+        };
+        write!(f, "{}", string)
+    }
 }
 
 impl Value {
@@ -55,12 +62,16 @@ impl Value {
     fn call(
         &self,
         interpreter: &mut Interpreter,
-        arguments: Vec<Self>,
+        mut arguments: Vec<Self>,
     ) -> Result<Self, RuntimeError> {
         match self {
             Value::Call(c) => c.call(interpreter, arguments),
-            Value::ClassDeclaration(c) => c.call(interpreter, arguments),
-            // Value::ClassInstance(c) => c,
+            Value::ClassDeclaration(c) => {
+                // add reference to self in the end because
+                // we need a reference to main class in instance
+                arguments.push(self.clone());
+                c.call(interpreter, arguments)
+            }
             _ => {
                 return Err(RuntimeError::NotCallable(self.to_string()));
             }
@@ -443,7 +454,7 @@ impl ExpressionVisitor<Result<Value, RuntimeError>> for Interpreter {
         let Value::ClassInstance(object) = &callee else {
             return Err(RuntimeError::NoProperties(callee));
         };
-        object.borrow().get(&expression.property, callee.clone())
+        object.get(&expression.property, callee.clone())
     }
     fn visit_set(
         &mut self,
@@ -454,9 +465,7 @@ impl ExpressionVisitor<Result<Value, RuntimeError>> for Interpreter {
             return Err(RuntimeError::NotSettable(callee.to_string()));
         };
         let value = self.evaluate(&expression.value)?;
-        object
-            .borrow_mut()
-            .set(expression.property.clone(), value.clone());
+        object.set(expression.property.clone(), value.clone());
         Ok(value)
     }
     fn visit_this(

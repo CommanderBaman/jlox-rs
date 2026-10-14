@@ -1,5 +1,5 @@
 use std::{
-    fmt::Debug,
+    fmt::{Debug, Display},
     rc::Rc,
     time::{self, UNIX_EPOCH},
 };
@@ -13,19 +13,13 @@ use crate::{
 
 pub type LoxFunction = FunctionDeclarationStatement;
 
-pub trait LoxCallable {
+pub trait LoxCallable: Display + Debug {
     fn arity(&self) -> usize;
     fn call(
         &self,
         interpreter: &mut Interpreter,
         arguments: Vec<Value>,
     ) -> Result<Value, RuntimeError>;
-}
-
-impl Debug for dyn LoxCallable {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "LoxCallable({} args)", self.arity())
-    }
 }
 
 impl LoxCallable for FunctionDeclarationStatement {
@@ -59,6 +53,7 @@ impl LoxCallable for FunctionDeclarationStatement {
     }
 }
 
+#[derive(Debug)]
 pub struct ClockFunction {}
 
 impl ClockFunction {
@@ -86,6 +81,11 @@ impl LoxCallable for ClockFunction {
         Ok(time::SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(|n| Value::Number(n.as_millis() as f64))?)
+    }
+}
+impl Display for ClockFunction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "clock()")
     }
 }
 

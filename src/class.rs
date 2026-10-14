@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc};
 
 use crate::{
     error::RuntimeError,
@@ -8,44 +8,7 @@ use crate::{
     statement::{ClassDeclarationStatement, FunctionDeclarationStatement},
 };
 
-#[derive(Debug, Clone)]
-pub struct LoxClassFunction {
-    declaration: Rc<FunctionDeclarationStatement>,
-    instance: Value,
-}
-
-impl LoxClassFunction {
-    fn new(
-        declaration: Rc<FunctionDeclarationStatement>,
-        instance: Value,
-    ) -> Self {
-        Self {
-            declaration,
-            instance,
-        }
-    }
-}
-
-impl LoxCallable for LoxClassFunction {
-    fn arity(&self) -> usize {
-        self.declaration.arity()
-    }
-    fn call(
-        &self,
-        interpreter: &mut Interpreter,
-        arguments: Vec<Value>,
-    ) -> Result<Value, RuntimeError> {
-        interpreter.environment.push_child();
-        interpreter
-            .environment
-            .define(VariableToken::This, self.instance.clone());
-        let value = self.declaration.call(interpreter, arguments);
-        interpreter.environment.pop_child()?;
-        value
-    }
-}
-
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct LoxClass {
     name: VariableToken,
     methods: HashMap<VariableToken, Rc<LoxFunction>>,
@@ -65,6 +28,7 @@ impl LoxClass {
         self.methods.get(name).cloned()
     }
 }
+
 impl std::fmt::Display for LoxClass {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} class", self.name.to_string())
@@ -78,42 +42,51 @@ impl LoxCallable for LoxClass {
     fn call(
         &self,
         _interpreter: &mut Interpreter,
-        _arguments: Vec<Value>,
+        arguments: Vec<Value>,
     ) -> Result<Value, RuntimeError> {
-        Ok(Value::ClassInstance(Rc::new(RefCell::new(
-            LoxInstance::new(self.clone()),
+        // extra 1 because of reference to self at last
+        if self.arity() + 1 != arguments.len() {
+            return Err(RuntimeError::IncorrectNumberOfArguments {
+                callee_name: self.name.to_string(),
+                expected_arguments: self.arity(),
+                received_arguments: arguments.len(),
+            });
+        }
+        let Some(Value::ClassDeclaration(self_reference)) = arguments.last()
+        else {
+            unreachable!("last element of class call should be self reference");
+        };
+        Ok(Value::ClassInstance(Rc::new(LoxInstance::new(
+            self_reference.clone(),
         ))))
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct LoxInstance {
-    class: LoxClass,
-    fields: HashMap<VariableToken, Value>,
+    fields: RefCell<HashMap<VariableToken, Value>>,
+    class: Rc<LoxClass>,
 }
 
 impl LoxInstance {
-    pub fn new(class: LoxClass) -> Self {
+    pub fn new(class: Rc<LoxClass>) -> Self {
         Self {
+            fields: RefCell::new(HashMap::new()),
             class,
-            fields: HashMap::new(),
         }
     }
-    // I really want to use an option here
     pub fn get(
         &self,
         property: &VariableToken,
         this_value: Value,
     ) -> Result<Value, RuntimeError> {
         self.fields
+            .borrow()
             .get(property)
             .cloned()
             .or_else(|| {
                 self.class.get_method(property).map(|f| {
-                    let call = Value::Call(Rc::new(LoxClassFunction::new(
-                        f, this_value,
-                    )));
-                    call
+                    Value::Call(Rc::new(LoxMethod::new(f, this_value)))
                 })
             })
             .ok_or(RuntimeError::PropertyNotFound(
@@ -121,12 +94,67 @@ impl LoxInstance {
                 self.to_string(),
             ))
     }
-    pub fn set(&mut self, property: VariableToken, value: Value) {
-        self.fields.insert(property, value);
+    pub fn set(&self, property: VariableToken, value: Value) {
+        self.fields.borrow_mut().insert(property, value);
     }
 }
 impl std::fmt::Display for LoxInstance {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} instance", self.class.name.to_string())
+        let fields_string = self
+            .fields
+            .borrow()
+            .iter()
+            .map(|(variable, value)| format!("{variable}:{value}"))
+            .collect::<Vec<String>>()
+            .join(", ");
+        write!(
+            f,
+            "{} instance with fields {{ {} }}",
+            self.class.name.to_string(),
+            fields_string
+        )
+    }
+}
+
+#[derive(Debug)]
+pub struct LoxMethod {
+    declaration: Rc<FunctionDeclarationStatement>,
+    instance: Value,
+}
+
+impl LoxMethod {
+    fn new(
+        declaration: Rc<FunctionDeclarationStatement>,
+        instance: Value,
+    ) -> Self {
+        Self {
+            declaration,
+            instance,
+        }
+    }
+}
+
+impl LoxCallable for LoxMethod {
+    fn arity(&self) -> usize {
+        self.declaration.arity()
+    }
+    fn call(
+        &self,
+        interpreter: &mut Interpreter,
+        arguments: Vec<Value>,
+    ) -> Result<Value, RuntimeError> {
+        interpreter.environment.push_child();
+        interpreter
+            .environment
+            .define(VariableToken::This, self.instance.clone());
+        let value = self.declaration.call(interpreter, arguments);
+        interpreter.environment.pop_child()?;
+        value
+    }
+}
+
+impl Display for LoxMethod {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.declaration)
     }
 }
