@@ -1,4 +1,5 @@
-use std::{collections::HashMap, fmt::Display};
+#![allow(unused_variables)]
+use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc};
 
 use crate::{
     error::RuntimeError, expression::VariableToken, interpreter::Value,
@@ -20,28 +21,42 @@ use crate::{
 //
 // In the end, holding a simple vector of all blocks,
 // and pushing and popping environment blocks is enough
+//
+// Edit: It was not enough. In order to properly implement closures,
+// I have to ensure that environments remain connected to one another
+// even after they are popped off. I keep thinking what data
+// structure other than linked lists would work best here. Linked List
+// are the obvious answer. I can not reorganize via a vector because
+// environments are like a cactus. Linked lists it is.
+// Good bye method chaining (╥﹏╥)
+
+type Link = Option<Rc<RefCell<EnvironmentBlock>>>;
+
+#[derive(Debug)]
+struct EnvironmentBlock {
+    // I have to make it option because of root node
+    parent: Link,
+    store: HashMap<VariableToken, Value>,
+}
 
 #[derive(Debug)]
 pub struct Environment {
-    blocks: Vec<EnvironmentBlock>,
+    // we can always access the tail end of the linked list
+    tail: Link,
+    num_blocks: usize,
 }
 
 impl Display for Environment {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let string = self
-            .blocks
-            .iter()
-            .enumerate()
-            .map(|(b, i)| format!("\t{} -> {}", b, i))
-            .collect::<Vec<String>>()
-            .join("\n");
-        write!(f, "[\n{}\n]", string)
+        let mut string = String::new();
+        let mut tail = self.tail.clone();
+        while let Some(block) = tail.take() {
+            let block = block.borrow();
+            string = format!("{} -> {}", block, string);
+            tail = block.parent.clone();
+        }
+        write!(f, "{}", string.split_at(string.len() - 4).0)
     }
-}
-
-#[derive(Debug)]
-struct EnvironmentBlock {
-    store: HashMap<VariableToken, Value>,
 }
 
 impl Display for EnvironmentBlock {
@@ -52,15 +67,16 @@ impl Display for EnvironmentBlock {
             .map(|(variable, value)| format!(" {} : {}", variable, value))
             .collect::<Vec<String>>()
             .join(", ");
-        write!(f, "{{{}}}", string)
+        write!(f, "{{{} }}", string)
     }
 }
 
 impl EnvironmentBlock {
-    fn new() -> Self {
-        Self {
+    fn new(parent: Link) -> Rc<RefCell<EnvironmentBlock>> {
+        Rc::new(RefCell::new(Self {
+            parent,
             store: HashMap::new(),
-        }
+        }))
     }
     fn define(&mut self, name: VariableToken, value: Value) {
         self.store.insert(name, value);
@@ -80,65 +96,90 @@ impl EnvironmentBlock {
 impl Environment {
     pub fn new() -> Self {
         Self {
-            blocks: vec![EnvironmentBlock::new()],
+            tail: Some(EnvironmentBlock::new(None)),
+            num_blocks: 1,
         }
     }
     pub fn pop_child(&mut self) -> Result<(), RuntimeError> {
-        // ensure that root is not popped
-        if self.blocks.len() == 1 {
-            return Err(RuntimeError::RootEnvironmentRemoved);
+        let parent = self
+            .tail
+            .as_ref()
+            .ok_or(RuntimeError::RootEnvironmentRemoved)
+            .map(|block| block.borrow().parent.clone())?;
+        match parent {
+            Some(_) => {
+                self.tail = parent;
+                self.num_blocks -= 1;
+                assert!(self.num_blocks >= 1);
+                Ok(())
+            }
+            None => Err(RuntimeError::RootEnvironmentRemoved),
         }
-        self.blocks.pop();
-        assert!(self.blocks.len() >= 1);
-        Ok(())
     }
     pub fn push_child(&mut self) {
-        self.blocks.push(EnvironmentBlock::new());
+        let new_block = EnvironmentBlock::new(self.tail.clone());
+        self.tail = Some(new_block);
+        self.num_blocks += 1;
     }
-    fn top_block(&mut self) -> &mut EnvironmentBlock {
-        match self.blocks.last_mut() {
-            Some(block) => block,
-            // unreachable because push and pop functions ensure
-            // that root is always present
-            None => unreachable!(),
+    pub fn define(
+        &mut self,
+        name: VariableToken,
+        value: Value,
+    ) -> Result<(), RuntimeError> {
+        let Some(tail) = &self.tail else {
+            return Err(RuntimeError::RootEnvironmentRemoved);
+        };
+        tail.borrow_mut().define(name, value);
+        Ok(())
+    }
+    pub fn get(&self, name: &VariableToken) -> Option<Value> {
+        let mut tail = self.tail.clone();
+        while let Some(block) = tail.take() {
+            let block = block.borrow();
+            match block.get(name) {
+                Some(v) => return Some(v.clone()),
+                None => tail = block.parent.clone(),
+            }
         }
+        None
     }
-    pub fn define(&mut self, name: VariableToken, value: Value) {
-        self.top_block().define(name, value);
-    }
-    pub fn get(&self, name: &VariableToken) -> Option<&Value> {
-        self.blocks.iter().rev().find_map(|block| block.get(name))
-    }
+
     pub fn assign(
         &mut self,
         name: &VariableToken,
         value: Value,
     ) -> Result<(), RuntimeError> {
-        let Some(block_to_update) = self
-            .blocks
-            .iter_mut()
-            .rev()
-            .find(|block| block.get(name).is_some())
-        else {
-            return Err(RuntimeError::VariableNotFound(name.to_string()));
-        };
-        let result = block_to_update.assign(name, value);
-        assert!(result);
-        Ok(())
+        let mut tail = self.tail.clone();
+        while let Some(block) = tail.take() {
+            let mut block = block.borrow_mut();
+            match block.get(name) {
+                Some(_) => {
+                    let result = block.assign(name, value);
+                    assert!(result);
+                    return Ok(());
+                }
+                None => {
+                    tail = block.parent.clone();
+                }
+            }
+        }
+        Err(RuntimeError::VariableNotFound(name.to_string()))
     }
+
     pub fn lookup(
         &self,
         name: &VariableToken,
         hop: Option<usize>,
-    ) -> Option<&Value> {
-        let block = match hop {
-            None => self.blocks.first(),
-            Some(hop) => self.blocks.get(self.blocks.len() - hop - 1),
-        };
-        // TODO: remove this expect, with an error
-        // assert as expect
-        let block = block.expect("block at hop is present at lookup");
-        block.get(name)
+    ) -> Option<Value> {
+        let num_hops = hop.unwrap_or(self.num_blocks - 1);
+        let mut tail = self.tail.clone();
+        for _ in 1..=num_hops {
+            let Some(block) = tail.take() else {
+                break;
+            };
+            tail = block.borrow().parent.clone();
+        }
+        tail.and_then(|block| block.borrow().get(name).cloned())
     }
     pub fn assign_at(
         &mut self,
@@ -146,17 +187,17 @@ impl Environment {
         value: Value,
         hop: Option<usize>,
     ) -> Result<(), RuntimeError> {
-        if let Some(hop) = hop {
-            let index = self.blocks.len() - hop - 1;
-            let block = self
-                .blocks
-                .get_mut(index)
-                .expect("block at hop is present at assign");
-            let result = block.assign(name, value);
-            assert!(result);
-            Ok(())
-        } else {
-            self.assign(name, value)
+        let num_hops = hop.unwrap_or(self.num_blocks - 1);
+        let mut tail = self.tail.clone();
+        for _ in 1..=num_hops {
+            let Some(block) = tail.take() else {
+                break;
+            };
+            tail = block.borrow().parent.clone();
         }
+        let block = tail.take().ok_or(RuntimeError::EnvironmentNotFound)?;
+        let result = block.borrow_mut().assign(name, value);
+        assert!(result);
+        Ok(())
     }
 }

@@ -42,7 +42,7 @@ impl LoxCallable for FunctionDeclarationStatement {
         for (name, arg) in self.parameters.iter().zip(arguments.iter()) {
             interpreter
                 .environment
-                .define(name.to_owned(), arg.to_owned());
+                .define(name.to_owned(), arg.to_owned())?;
         }
         let value = interpreter.visit_block(self.body.clone());
         interpreter.environment.pop_child()?;
@@ -89,9 +89,12 @@ impl Display for ClockFunction {
     }
 }
 
-pub fn add_native_functions(interpreter: &mut Interpreter) {
+pub fn add_native_functions(
+    interpreter: &mut Interpreter,
+) -> Result<(), RuntimeError> {
     interpreter.environment.define(
         VariableToken::Identifier("clock".to_owned()),
         ClockFunction::as_value(),
-    );
+    )?;
+    Ok(())
 }

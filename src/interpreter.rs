@@ -401,7 +401,6 @@ impl ExpressionVisitor<Result<Value, RuntimeError>> for Interpreter {
         let addr = expression.addr();
         self.environment
             .lookup(&expression.variable, self.locals.get(&addr).cloned())
-            .cloned()
             .ok_or_else(|| {
                 RuntimeError::VariableNotFound(expression.variable.to_string())
             })
@@ -475,7 +474,6 @@ impl ExpressionVisitor<Result<Value, RuntimeError>> for Interpreter {
         let addr = expression.addr();
         self.environment
             .lookup(&expression.token, self.locals.get(&addr).cloned())
-            .cloned()
             .ok_or_else(|| {
                 RuntimeError::VariableNotFound(expression.token.to_string())
             })
@@ -508,7 +506,7 @@ impl StatementVisitor<Result<Value, RuntimeError>> for Interpreter {
             .transpose()?
             .unwrap_or(Value::Uninitialized);
         self.environment
-            .define(statement.name.clone(), value.clone());
+            .define(statement.name.clone(), value.clone())?;
         Ok(value)
     }
     fn visit_block(
@@ -554,8 +552,10 @@ impl StatementVisitor<Result<Value, RuntimeError>> for Interpreter {
         &mut self,
         statement: Rc<FunctionDeclarationStatement>,
     ) -> Result<Value, RuntimeError> {
-        self.environment
-            .define(statement.name.clone(), Value::Call(statement.to_owned()));
+        self.environment.define(
+            statement.name.clone(),
+            Value::Call(statement.to_owned()),
+        )?;
         Ok(Value::Nil)
     }
     fn visit_return(
@@ -574,7 +574,8 @@ impl StatementVisitor<Result<Value, RuntimeError>> for Interpreter {
         &mut self,
         statement: Rc<ClassDeclarationStatement>,
     ) -> Result<Value, RuntimeError> {
-        self.environment.define(statement.name.clone(), Value::Nil);
+        self.environment
+            .define(statement.name.clone(), Value::Nil)?;
         let class =
             Value::ClassDeclaration(Rc::new(LoxClass::new(statement.clone())));
         self.environment.assign(&statement.name, class)?;

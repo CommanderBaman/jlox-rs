@@ -11,12 +11,12 @@ pub struct Lox {
 }
 
 impl Lox {
-    pub fn new(interactive: bool) -> Self {
+    pub fn new(interactive: bool) -> Result<Self, LanguageError> {
         let mut interpreter = Interpreter::new(interactive);
-        add_native_functions(&mut interpreter);
-        Self {
+        add_native_functions(&mut interpreter)?;
+        Ok(Self {
             interpreter, // interactive,
-        }
+        })
     }
     pub fn run(
         &mut self,

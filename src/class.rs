@@ -145,7 +145,7 @@ impl LoxCallable for LoxMethod {
         interpreter.environment.push_child();
         interpreter
             .environment
-            .define(VariableToken::This, self.instance.clone());
+            .define(VariableToken::This, self.instance.clone())?;
         let value = self.declaration.call(interpreter, arguments);
         interpreter.environment.pop_child()?;
         value

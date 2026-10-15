@@ -66,6 +66,8 @@ pub enum RuntimeError {
     PropertyNotFound(VariableToken, String),
     #[error("can not set properties on instance: {0}")]
     NotSettable(String),
+    #[error("environment not found")]
+    EnvironmentNotFound,
 }
 
 #[derive(Error, Debug)]
