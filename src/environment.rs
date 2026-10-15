@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
 use crate::{
     error::RuntimeError, expression::VariableToken, interpreter::Value,
@@ -21,12 +21,39 @@ use crate::{
 // In the end, holding a simple vector of all blocks,
 // and pushing and popping environment blocks is enough
 
+#[derive(Debug)]
 pub struct Environment {
     blocks: Vec<EnvironmentBlock>,
 }
 
+impl Display for Environment {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let string = self
+            .blocks
+            .iter()
+            .enumerate()
+            .map(|(b, i)| format!("\t{} -> {}", b, i))
+            .collect::<Vec<String>>()
+            .join("\n");
+        write!(f, "[\n{}\n]", string)
+    }
+}
+
+#[derive(Debug)]
 struct EnvironmentBlock {
     store: HashMap<VariableToken, Value>,
+}
+
+impl Display for EnvironmentBlock {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let string = self
+            .store
+            .iter()
+            .map(|(variable, value)| format!(" {} : {}", variable, value))
+            .collect::<Vec<String>>()
+            .join(", ");
+        write!(f, "{{{}}}", string)
+    }
 }
 
 impl EnvironmentBlock {
