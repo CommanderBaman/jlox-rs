@@ -1,11 +1,19 @@
 class Person {
-  sayName() {
-    print this.name;
+  getName() {
+    return this.name;
   }
 }
 
 var jane = Person();
 jane.name = "Jane";
 
-var method = jane.sayName;
-method(); // ?
+var bill = Person();
+bill.name = "Bill";
+
+var method = jane.getName;
+print "method = jane.getName =>  method() = 'Jane'";
+print method() == "Jane"; // ?
+
+bill.getName = jane.getName;
+print "bill.getName = jane.getName =>  method() = 'Bill'";
+print bill.getName() == "Bill";
