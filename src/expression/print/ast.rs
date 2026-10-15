@@ -95,12 +95,12 @@ mod test {
             (
                 LiteralExpression::new(Token::True)
                     .expect("true literal correct conversion"),
-                "True",
+                "true",
             ),
             (
                 LiteralExpression::new(Token::False)
                     .expect("false literal correct conversion"),
-                "False",
+                "false",
             ),
         ];
 
@@ -118,14 +118,14 @@ mod test {
                     LiteralExpression::new(Token::True)
                         .expect("true literal correct conversion"),
                 ),
-                "(group True)",
+                "(group true)",
             ),
             (
                 GroupingExpression::new(
                     LiteralExpression::new(Token::False)
                         .expect("false literal correct conversion"),
                 ),
-                "(group False)",
+                "(group false)",
             ),
         ];
 
@@ -152,9 +152,6 @@ mod test {
         )
         .expect("-123 * (45.67) is a correct expression");
         let mut printer = SimpleAstPrinter::new();
-        assert_eq!(
-            printer.to_string(&expression),
-            "(Star (Minus Number(123)) (group Number(45.67)))"
-        );
+        assert_eq!(printer.to_string(&expression), "(* (- 123) (group 45.67))");
     }
 }

@@ -5,6 +5,7 @@ fun notMethod(argument) {
 }
 
 var box = Box();
+box.name = "name";
 box.outsideMethod = notMethod;
 box.outsideMethod("argument");
 

@@ -2,8 +2,6 @@
 
 use std::{fmt::Display, rc::Rc};
 
-use strum::Display;
-
 use crate::{
     error::LanguageError,
     expression::{Expression, VariableToken},
@@ -40,21 +38,34 @@ use crate::{
 // classDeclaration ->  "class" IDENTIFIER "{" function* "}"
 //
 // NOTE: forStmt is syntactic sugar for whileStmt
-#[derive(Debug, Display, Clone)]
+#[derive(Debug, Clone)]
 pub enum Statement {
-    #[strum(to_string = "Expression({0:?})")]
     Expression(Rc<ExpressionStatement>),
-    #[strum(to_string = "Print({0:?})")]
     Print(Rc<PrintStatement>),
-    #[strum(to_string = "VariableDeclaration({0:?})")]
     VariableDeclaration(Rc<VariableDeclarationStatement>),
-    #[strum(to_string = "Block({0:?})")]
     Block(Rc<BlockStatement>),
     If(Rc<IfStatement>),
     While(Rc<WhileStatement>),
     Function(Rc<FunctionDeclarationStatement>),
     Return(Rc<ReturnStatement>),
     Class(Rc<ClassDeclarationStatement>),
+}
+
+impl Display for Statement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let string = match self {
+            Self::Expression(e) => format!("{}", e),
+            Self::Print(e) => format!("{}", e),
+            Self::VariableDeclaration(e) => format!("{}", e),
+            Self::Block(e) => format!("{}", e),
+            Self::If(e) => format!("{}", e),
+            Self::While(e) => format!("{}", e),
+            Self::Function(e) => format!("{}", e),
+            Self::Return(e) => format!("{}", e),
+            Self::Class(e) => format!("{}", e),
+        };
+        write!(f, "{}", string)
+    }
 }
 
 pub trait StatementVisitor<R> {
@@ -111,6 +122,12 @@ impl ExpressionStatement {
     }
 }
 
+impl Display for ExpressionStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{};", self.expression)
+    }
+}
+
 // printStmt → "print" expression ";"
 #[derive(Debug, Clone)]
 pub struct PrintStatement {
@@ -120,6 +137,12 @@ pub struct PrintStatement {
 impl PrintStatement {
     pub fn new(expression: Expression) -> Statement {
         Statement::Print(Rc::new(Self { expression }))
+    }
+}
+
+impl Display for PrintStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "print {};", self.expression)
     }
 }
 
@@ -139,6 +162,16 @@ impl VariableDeclarationStatement {
             name: name.try_into()?,
             expression,
         })))
+    }
+}
+
+impl Display for VariableDeclarationStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let expression_string = self
+            .expression
+            .as_ref()
+            .map_or_default(|e| format!(" = {}", e));
+        write!(f, "var {}{};", self.name, expression_string)
     }
 }
 
@@ -192,6 +225,20 @@ impl IfStatement {
     }
 }
 
+impl Display for IfStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let else_string = self
+            .else_branch
+            .as_ref()
+            .map_or_default(|b| format!(" else {}", b));
+        write!(
+            f,
+            "if ({}) {}{}",
+            self.condition, self.then_branch, else_string
+        )
+    }
+}
+
 // whileStmt -> "while" "(" expression ")" statement
 #[derive(Debug, Clone)]
 pub struct WhileStatement {
@@ -205,6 +252,12 @@ impl WhileStatement {
             condition,
             body: Rc::new(body),
         }))
+    }
+}
+
+impl Display for WhileStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "while ({}) {}", self.condition, self.body)
     }
 }
 
@@ -247,7 +300,7 @@ impl Display for FunctionDeclarationStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "fun {} ( {} ) {} ",
+            "fun {}({}) {}",
             self.name,
             self.parameters
                 .iter()
@@ -268,6 +321,16 @@ pub struct ReturnStatement {
 impl ReturnStatement {
     pub fn new(value: Option<Expression>) -> Statement {
         Statement::Return(Rc::new(Self { value }))
+    }
+}
+
+impl Display for ReturnStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "return{};",
+            self.value.as_ref().map_or_default(|e| format!(" {e}"))
+        )
     }
 }
 
@@ -295,5 +358,20 @@ impl ClassDeclarationStatement {
             })
             .collect::<Result<Vec<Rc<FunctionDeclarationStatement>>, LanguageError>>()?;
         Ok(Statement::Class(Rc::new(Self { name, functions })))
+    }
+}
+
+impl Display for ClassDeclarationStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "class {} {{{}}}",
+            self.name,
+            self.functions
+                .iter()
+                .map(|f| format!("{f}"))
+                .collect::<Vec<String>>()
+                .join(", ")
+        )
     }
 }

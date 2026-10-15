@@ -31,7 +31,7 @@ impl LoxClass {
 
 impl std::fmt::Display for LoxClass {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} class", self.name.to_string())
+        write!(f, "{} class", self.name)
     }
 }
 
@@ -104,14 +104,13 @@ impl std::fmt::Display for LoxInstance {
             .fields
             .borrow()
             .iter()
-            .map(|(variable, value)| format!("{variable}:{value}"))
+            .map(|(variable, value)| format!("{variable} : {value} "))
             .collect::<Vec<String>>()
             .join(", ");
         write!(
             f,
-            "{} instance with fields {{ {} }}",
-            self.class.name.to_string(),
-            fields_string
+            "{} instance with fields {{ {}}}",
+            self.class.name, fields_string
         )
     }
 }

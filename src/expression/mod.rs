@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{fmt::Display, rc::Rc};
 
 use crate::{error::LanguageError, token::Token};
 use strum::Display;
@@ -8,25 +8,42 @@ pub mod print;
 // Grammar
 // expression -> literal | unary | binary | grouping
 //              | variable | assignment | logical | call | this
-#[derive(Clone, Debug, Display)]
+#[derive(Clone, Debug)]
 pub enum Expression {
-    #[strum(to_string = "LiteralExpr({0})")]
     Literal(LiteralExpression),
     Grouping(GroupingExpression),
     Unary(UnaryExpression),
-    #[strum(to_string = "BinaryExpr({0})")]
     Binary(BinaryExpression),
-    #[strum(to_string = "VariableExpr({0})")]
     Variable(VariableExpression),
     Assignment(AssignmentExpression),
     Logical(LogicalExpression),
-    #[strum(to_string = "CallExpr({0})")]
     Call(CallExpression),
-    #[strum(to_string = "GetExpr({0})")]
     Get(GetExpression),
-    #[strum(to_string = "SetExpr({0})")]
     Set(SetExpression),
     This(ThisExpression),
+}
+
+impl Display for Expression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // TODO: please use a custom macro to generate this
+        // Reference: https://lukaswirth.dev/tlborm/introduction.html
+        // Little book of rust macros
+        let string = match self {
+            Self::Literal(e) => format!("{e}"),
+            Self::Grouping(e) => format!("{e}"),
+            Self::Unary(e) => format!("{e}"),
+            Self::Binary(e) => format!("{e}"),
+            Self::Variable(e) => format!("{e}"),
+            Self::Assignment(e) => format!("{e}"),
+            Self::Logical(e) => format!("{e}"),
+            Self::Call(e) => format!("{e}"),
+            Self::Get(e) => format!("{e}"),
+            Self::Set(e) => format!("{e}"),
+            Self::This(e) => format!("{e}"),
+        };
+
+        write!(f, "{}", string)
+    }
 }
 
 // NOTE: we require mutable expression where ever we might need to evaluate
@@ -66,12 +83,15 @@ impl Expression {
 // literal        → NUMBER | STRING | "true" | "false" | "nil" | this
 #[derive(Clone, Debug, Display)]
 pub enum LiteralToken {
-    #[strum(to_string = "Number({0})")]
+    #[strum(to_string = "{0}")]
     Number(f64),
-    #[strum(to_string = "String('{0}')")]
+    #[strum(to_string = "'{0}'")]
     String(String),
+    #[strum(to_string = "true")]
     True,
+    #[strum(to_string = "false")]
     False,
+    #[strum(to_string = "nil")]
     Nil,
 }
 impl TryFrom<Token> for LiteralToken {
@@ -104,9 +124,9 @@ impl LiteralExpression {
     }
 }
 
-impl std::fmt::Display for LiteralExpression {
+impl Display for LiteralExpression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.literal.to_string())
+        write!(f, "{}", self.literal)
     }
 }
 
@@ -126,10 +146,18 @@ impl GroupingExpression {
     }
 }
 
+impl Display for GroupingExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({})", self.expression)
+    }
+}
+
 // unary          → ( "-" | "!" ) expression
 #[derive(Clone, Debug, Display)]
 pub enum UnaryOperator {
+    #[strum(to_string = "!")]
     Bang,
+    #[strum(to_string = "-")]
     Minus,
 }
 impl TryFrom<Token> for UnaryOperator {
@@ -165,20 +193,35 @@ impl UnaryExpression {
         }))
     }
 }
+impl Display for UnaryExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}{}", self.operator, self.expression)
+    }
+}
 
 // binary         → expression operator expression
 // operator       → "==" | "!=" | "<" | "<=" | ">" | ">=" | "+" | "-" | "*" | "/"
 #[derive(Clone, Debug, Display)]
 pub enum BinaryOperator {
+    #[strum(to_string = "==")]
     EqualEqual,
+    #[strum(to_string = "!=")]
     BangEqual,
+    #[strum(to_string = "<")]
     Less,
+    #[strum(to_string = "<=")]
     LessEqual,
+    #[strum(to_string = ">")]
     Greater,
+    #[strum(to_string = ">=")]
     GreaterEqual,
+    #[strum(to_string = "+")]
     Plus,
+    #[strum(to_string = "-")]
     Minus,
+    #[strum(to_string = "*")]
     Star,
+    #[strum(to_string = "/")]
     Slash,
 }
 impl TryFrom<Token> for BinaryOperator {
@@ -231,9 +274,7 @@ impl std::fmt::Display for BinaryExpression {
         write!(
             f,
             "{} {} {}",
-            self.left_expression.to_string(),
-            self.operator,
-            self.right_expression.to_string()
+            self.left_expression, self.operator, self.right_expression,
         )
     }
 }
@@ -241,7 +282,9 @@ impl std::fmt::Display for BinaryExpression {
 // operator -> "and" | "or"
 #[derive(Clone, Debug, Display)]
 pub enum LogicalOperator {
+    #[strum(to_string = "and")]
     And,
+    #[strum(to_string = "or")]
     Or,
 }
 impl TryFrom<Token> for LogicalOperator {
@@ -286,9 +329,7 @@ impl std::fmt::Display for LogicalExpression {
         write!(
             f,
             "{} {} {}",
-            self.left_expression.to_string(),
-            self.operator,
-            self.right_expression.to_string()
+            self.left_expression, self.operator, self.right_expression,
         )
     }
 }
@@ -329,7 +370,7 @@ impl VariableExpression {
 
 impl std::fmt::Display for VariableExpression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.variable.to_string())
+        write!(f, "{}", self.variable)
     }
 }
 
@@ -353,12 +394,7 @@ impl AssignmentExpression {
 
 impl std::fmt::Display for AssignmentExpression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{} = {}",
-            self.variable.to_string(),
-            self.expression.to_string()
-        )
+        write!(f, "{} = {}", self.variable, self.expression)
     }
 }
 
@@ -461,5 +497,11 @@ impl ThisExpression {
             });
         }
         Ok(Expression::This(Self { token: this_token }))
+    }
+}
+
+impl Display for ThisExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "this")
     }
 }
