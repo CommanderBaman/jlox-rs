@@ -36,6 +36,7 @@ enum ClassKind {
     Class,
 }
 
+#[derive(Debug)]
 enum VariableState {
     Define,
     Declare,
@@ -183,7 +184,7 @@ impl<'a> Resolver<'a> {
         self.scopes.last().and_then(|scope| scope.get(name))
     }
 
-    fn resolve_local<T: Address>(
+    fn resolve_local<T: Address + std::fmt::Display>(
         &mut self,
         expression: &T,
         name: &VariableToken,

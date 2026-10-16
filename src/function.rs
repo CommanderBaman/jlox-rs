@@ -7,11 +7,9 @@ use std::{
 use crate::{
     error::RuntimeError,
     expression::VariableToken,
-    interpreter::{Interpreter, Value},
+    interpreter::{Interpreter, InterpreterEnvironment, Value},
     statement::{FunctionDeclarationStatement, StatementVisitor},
 };
-
-pub type LoxFunction = FunctionDeclarationStatement;
 
 pub trait LoxCallable: Display + Debug {
     fn arity(&self) -> usize;
@@ -22,9 +20,30 @@ pub trait LoxCallable: Display + Debug {
     ) -> Result<Value, RuntimeError>;
 }
 
-impl LoxCallable for FunctionDeclarationStatement {
+#[derive(Debug)]
+pub struct LoxFunction {
+    declaration: Rc<FunctionDeclarationStatement>,
+    environment: InterpreterEnvironment,
+}
+
+impl LoxFunction {
+    // pub fn bind(&mut self, environment: Environment) {
+    //     self.environment = environment;
+    // }
+    pub fn new(
+        declaration: Rc<FunctionDeclarationStatement>,
+        environment: InterpreterEnvironment,
+    ) -> Rc<Self> {
+        Rc::new(Self {
+            declaration,
+            environment,
+        })
+    }
+}
+
+impl LoxCallable for LoxFunction {
     fn arity(&self) -> usize {
-        self.parameters.len()
+        self.declaration.parameters.len()
     }
     fn call(
         &self,
@@ -33,23 +52,44 @@ impl LoxCallable for FunctionDeclarationStatement {
     ) -> Result<Value, RuntimeError> {
         if self.arity() != arguments.len() {
             return Err(RuntimeError::IncorrectNumberOfArguments {
-                callee_name: self.name.to_string(),
+                callee_name: self.declaration.name.to_string(),
                 expected_arguments: self.arity(),
                 received_arguments: arguments.len(),
             });
         }
-        interpreter.environment.push_child();
-        for (name, arg) in self.parameters.iter().zip(arguments.iter()) {
+        let old_environment =
+            interpreter.assign_environment(self.environment.clone());
+        // interpreter.environment.borrow_mut().push_child();
+        interpreter.push_environment();
+        for (name, arg) in
+            self.declaration.parameters.iter().zip(arguments.iter())
+        {
             interpreter
                 .environment
+                .borrow_mut()
                 .define(name.to_owned(), arg.to_owned())?;
         }
-        let value = interpreter.visit_block(self.body.clone());
-        interpreter.environment.pop_child()?;
+        let value = interpreter.visit_block(self.declaration.body.clone());
+        // interpreter.environment.borrow_mut().pop_child()?;
+        interpreter.pop_environment()?;
+        let _ = interpreter.assign_environment(old_environment);
         match value {
             Err(RuntimeError::Return(v)) => Ok(v),
             v => v,
         }
+    }
+}
+
+impl Display for LoxFunction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // NOTE: can not print whole environment or will be stuck in
+        // recursive loop
+        write!(
+            f,
+            "[call ({}) in environment with id {})]",
+            self.declaration,
+            self.environment.borrow().id
+        )
     }
 }
 
@@ -85,14 +125,14 @@ impl LoxCallable for ClockFunction {
 }
 impl Display for ClockFunction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "clock()")
+        write!(f, "inbuilt fun clock()")
     }
 }
 
 pub fn add_native_functions(
     interpreter: &mut Interpreter,
 ) -> Result<(), RuntimeError> {
-    interpreter.environment.define(
+    interpreter.environment.borrow_mut().define(
         VariableToken::Identifier("clock".to_owned()),
         ClockFunction::as_value(),
     )?;

@@ -144,6 +144,7 @@ print c;
             return a;
         }
         print "closure reference check";
+        print showA();
         print "inner" == showA();
         var a = "block";
         print "closure with resolver reference check";
@@ -180,3 +181,22 @@ print fib(5) == 5;
 
 print "fib(6) == 8";
 print fib(6) == 8;
+
+fun outer() {
+    var a = "hello";
+    fun inner() {
+        var b = a;
+        a = a + "2";
+        return b;
+    }
+    return inner;
+}
+
+var x = outer();
+print "closure 3 - first returns base";
+print x() == "hello";
+print "closure 3 - second modifies first";
+print x() == "hello2";
+print "closure 3 - third modifies second";
+print x() == "hello22";
+

@@ -4,8 +4,8 @@ use crate::{
     error::RuntimeError,
     expression::VariableToken,
     function::{LoxCallable, LoxFunction},
-    interpreter::{Interpreter, Value},
-    statement::{ClassDeclarationStatement, FunctionDeclarationStatement},
+    interpreter::{Interpreter, InterpreterEnvironment, Value},
+    statement::ClassDeclarationStatement,
 };
 
 #[derive(Debug)]
@@ -14,10 +14,16 @@ pub struct LoxClass {
     methods: HashMap<VariableToken, Rc<LoxFunction>>,
 }
 impl LoxClass {
-    pub fn new(declaration: Rc<ClassDeclarationStatement>) -> Self {
+    pub fn new(
+        declaration: Rc<ClassDeclarationStatement>,
+        environment: InterpreterEnvironment,
+    ) -> Self {
         let mut methods = HashMap::new();
         for method in &declaration.functions {
-            methods.insert(method.name.clone(), method.clone());
+            methods.insert(
+                method.name.clone(),
+                LoxFunction::new(method.clone(), environment.clone()),
+            );
         }
         Self {
             name: declaration.name.clone(),
@@ -117,15 +123,12 @@ impl std::fmt::Display for LoxInstance {
 
 #[derive(Debug)]
 pub struct LoxMethod {
-    declaration: Rc<FunctionDeclarationStatement>,
+    declaration: Rc<LoxFunction>,
     instance: Value,
 }
 
 impl LoxMethod {
-    fn new(
-        declaration: Rc<FunctionDeclarationStatement>,
-        instance: Value,
-    ) -> Self {
+    fn new(declaration: Rc<LoxFunction>, instance: Value) -> Self {
         Self {
             declaration,
             instance,
@@ -142,12 +145,15 @@ impl LoxCallable for LoxMethod {
         interpreter: &mut Interpreter,
         arguments: Vec<Value>,
     ) -> Result<Value, RuntimeError> {
-        interpreter.environment.push_child();
+        // interpreter.environment.borrow_mut().push_child();
+        interpreter.push_environment();
         interpreter
             .environment
+            .borrow_mut()
             .define(VariableToken::This, self.instance.clone())?;
         let value = self.declaration.call(interpreter, arguments);
-        interpreter.environment.pop_child()?;
+        // interpreter.environment.borrow_mut().pop_child()?;
+        interpreter.pop_environment()?;
         value
     }
 }

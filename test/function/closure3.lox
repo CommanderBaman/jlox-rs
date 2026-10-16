@@ -1,11 +1,14 @@
 fun outer() {
     var a = "hello";
     fun inner() {
-        return a;
+        var b = a;
+        a = a + "2";
+        return b;
     }
     return inner;
 }
 
 var x = outer();
-print x;
-print x();
+print x() == "hello";
+print x() == "hello2";
+print x() == "hello22";

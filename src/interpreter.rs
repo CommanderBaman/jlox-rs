@@ -1,4 +1,5 @@
 use std::{
+    cell::RefCell,
     cmp::Ordering,
     collections::HashMap,
     ops::{Add, Div, Mul, Sub},
@@ -16,7 +17,7 @@ use crate::{
         SetExpression, ThisExpression, UnaryExpression, UnaryOperator,
         VariableExpression,
     },
-    function::LoxCallable,
+    function::{LoxCallable, LoxFunction},
     resolver::Address,
     statement::{
         BlockStatement, ClassDeclarationStatement, ExpressionStatement,
@@ -273,8 +274,10 @@ impl Div for Value {
     }
 }
 
+pub type InterpreterEnvironment = Rc<RefCell<Environment>>;
+
 pub struct Interpreter {
-    pub environment: Environment,
+    pub environment: InterpreterEnvironment,
     print_expression: bool,
     locals: HashMap<usize, usize>,
 }
@@ -282,7 +285,7 @@ pub struct Interpreter {
 impl Interpreter {
     pub fn new(print_expression: bool) -> Self {
         Interpreter {
-            environment: Environment::new(),
+            environment: Rc::new(RefCell::new(Environment::new())),
             print_expression,
             locals: HashMap::new(),
         }
@@ -322,6 +325,29 @@ impl Interpreter {
     }
     pub fn resolve(&mut self, location: usize, depth: usize) {
         self.locals.insert(location, depth);
+    }
+
+    pub fn assign_environment(
+        &mut self,
+        environment: InterpreterEnvironment,
+    ) -> InterpreterEnvironment {
+        let old_environment = self.environment.clone();
+        self.environment = environment;
+        old_environment
+    }
+    pub fn push_environment(&mut self) {
+        self.environment =
+            Rc::new(RefCell::new(Environment::child(self.environment.clone())));
+    }
+    pub fn pop_environment(&mut self) -> Result<(), RuntimeError> {
+        let parent = self.environment.borrow().parent.clone();
+        match parent {
+            None => Err(RuntimeError::RootEnvironmentRemoved),
+            Some(p) => {
+                self.environment = p;
+                Ok(())
+            }
+        }
     }
 }
 
@@ -400,6 +426,7 @@ impl ExpressionVisitor<Result<Value, RuntimeError>> for Interpreter {
     ) -> Result<Value, RuntimeError> {
         let addr = expression.addr();
         self.environment
+            .borrow()
             .lookup(&expression.variable, self.locals.get(&addr).cloned())
             .ok_or_else(|| {
                 RuntimeError::VariableNotFound(expression.variable.to_string())
@@ -411,6 +438,7 @@ impl ExpressionVisitor<Result<Value, RuntimeError>> for Interpreter {
     ) -> Result<Value, RuntimeError> {
         let value = self.evaluate(&expression.expression)?;
         self.environment
+            .borrow_mut()
             .assign(&expression.variable, value.clone())?;
         Ok(value)
     }
@@ -473,6 +501,7 @@ impl ExpressionVisitor<Result<Value, RuntimeError>> for Interpreter {
     ) -> Result<Value, RuntimeError> {
         let addr = expression.addr();
         self.environment
+            .borrow()
             .lookup(&expression.token, self.locals.get(&addr).cloned())
             .ok_or_else(|| {
                 RuntimeError::VariableNotFound(expression.token.to_string())
@@ -506,6 +535,7 @@ impl StatementVisitor<Result<Value, RuntimeError>> for Interpreter {
             .transpose()?
             .unwrap_or(Value::Uninitialized);
         self.environment
+            .borrow_mut()
             .define(statement.name.clone(), value.clone())?;
         Ok(value)
     }
@@ -513,18 +543,20 @@ impl StatementVisitor<Result<Value, RuntimeError>> for Interpreter {
         &mut self,
         statement: Rc<BlockStatement>,
     ) -> Result<Value, RuntimeError> {
-        self.environment.push_child();
+        // self.environment.borrow_mut().push_child();
+        self.push_environment();
         for statement in &statement.statements {
             match self.execute(statement.clone()) {
                 Ok(_) => {}
                 Err(e) => {
                     // how much I wish there was a defer
-                    self.environment.pop_child()?;
+                    self.pop_environment()?;
                     return Err(e);
                 }
             }
         }
-        self.environment.pop_child()?;
+        // self.environment.borrow_mut().pop_child()?;
+        self.pop_environment()?;
         Ok(Value::Nil)
     }
     fn visit_if(
@@ -552,9 +584,12 @@ impl StatementVisitor<Result<Value, RuntimeError>> for Interpreter {
         &mut self,
         statement: Rc<FunctionDeclarationStatement>,
     ) -> Result<Value, RuntimeError> {
-        self.environment.define(
+        self.environment.borrow_mut().define(
             statement.name.clone(),
-            Value::Call(statement.to_owned()),
+            Value::Call(LoxFunction::new(
+                statement.clone(),
+                self.environment.clone(),
+            )),
         )?;
         Ok(Value::Nil)
     }
@@ -575,10 +610,15 @@ impl StatementVisitor<Result<Value, RuntimeError>> for Interpreter {
         statement: Rc<ClassDeclarationStatement>,
     ) -> Result<Value, RuntimeError> {
         self.environment
+            .borrow_mut()
             .define(statement.name.clone(), Value::Nil)?;
-        let class =
-            Value::ClassDeclaration(Rc::new(LoxClass::new(statement.clone())));
-        self.environment.assign(&statement.name, class)?;
+        let class = Value::ClassDeclaration(Rc::new(LoxClass::new(
+            statement.clone(),
+            self.environment.clone(),
+        )));
+        self.environment
+            .borrow_mut()
+            .assign(&statement.name, class)?;
         Ok(Value::Nil)
     }
 }

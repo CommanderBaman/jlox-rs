@@ -29,33 +29,40 @@ use crate::{
 // are the obvious answer. I can not reorganize via a vector because
 // environments are like a cactus. Linked lists it is.
 // Good bye method chaining (╥﹏╥)
+//
+// Edit 2: I made a mistake. I thought we need to just pass environment
+// into function and we are done. I forgot that environment moves as we
+// progress through code. So the function that hold it also move. This
+// causes function environment to change as soon as we do pop or push
+// instructions on the environment.
+// So, I finally implemented here - block for storing variables and
+// environment for placing several such stores in memory
 
-type Link = Option<Rc<RefCell<EnvironmentBlock>>>;
+type Link = Option<Rc<RefCell<Environment>>>;
 
 #[derive(Debug)]
 struct EnvironmentBlock {
-    // I have to make it option because of root node
-    parent: Link,
     store: HashMap<VariableToken, Value>,
 }
 
 #[derive(Debug)]
 pub struct Environment {
-    // we can always access the tail end of the linked list
-    tail: Link,
-    num_blocks: usize,
+    pub id: u8,
+    pub parent: Link,
+    num_parents: usize,
+    store: EnvironmentBlock,
 }
 
 impl Display for Environment {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut string = String::new();
-        let mut tail = self.tail.clone();
-        while let Some(block) = tail.take() {
+        let mut string = self.format_stored();
+        let mut tail = self.parent.clone();
+        while let Some(block) = tail {
             let block = block.borrow();
-            string = format!("{} -> {}", block, string);
+            string = format!("{} -> {}", string, block.format_stored());
             tail = block.parent.clone();
         }
-        write!(f, "{}", string.split_at(string.len() - 4).0)
+        write!(f, "{string}")
     }
 }
 
@@ -64,19 +71,18 @@ impl Display for EnvironmentBlock {
         let string = self
             .store
             .iter()
-            .map(|(variable, value)| format!(" {} : {}", variable, value))
+            .map(|(variable, value)| format!(" {} : {} ", variable, value))
             .collect::<Vec<String>>()
             .join(", ");
-        write!(f, "{{{} }}", string)
+        write!(f, "{{{}}}", string)
     }
 }
 
 impl EnvironmentBlock {
-    fn new(parent: Link) -> Rc<RefCell<EnvironmentBlock>> {
-        Rc::new(RefCell::new(Self {
-            parent,
+    fn new() -> Self {
+        Self {
             store: HashMap::new(),
-        }))
+        }
     }
     fn define(&mut self, name: VariableToken, value: Value) {
         self.store.insert(name, value);
@@ -96,52 +102,67 @@ impl EnvironmentBlock {
 impl Environment {
     pub fn new() -> Self {
         Self {
-            tail: Some(EnvironmentBlock::new(None)),
-            num_blocks: 1,
+            parent: None,
+            num_parents: 0,
+            id: rand::random(),
+            store: EnvironmentBlock::new(),
         }
     }
-    pub fn pop_child(&mut self) -> Result<(), RuntimeError> {
-        let parent = self
-            .tail
-            .as_ref()
-            .ok_or(RuntimeError::RootEnvironmentRemoved)
-            .map(|block| block.borrow().parent.clone())?;
-        match parent {
-            Some(_) => {
-                self.tail = parent;
-                self.num_blocks -= 1;
-                assert!(self.num_blocks >= 1);
-                Ok(())
-            }
-            None => Err(RuntimeError::RootEnvironmentRemoved),
+    pub fn child(environment: Rc<RefCell<Environment>>) -> Self {
+        let num_parents = environment.borrow().num_parents + 1;
+        Self {
+            parent: Some(environment),
+            num_parents,
+            id: rand::random(),
+            store: EnvironmentBlock::new(),
         }
     }
-    pub fn push_child(&mut self) {
-        let new_block = EnvironmentBlock::new(self.tail.clone());
-        self.tail = Some(new_block);
-        self.num_blocks += 1;
+    pub fn format_stored(&self) -> String {
+        format!(
+            "[id = {}, num_parents = {}, store = {}]",
+            self.id, self.num_parents, self.store
+        )
     }
     pub fn define(
         &mut self,
         name: VariableToken,
         value: Value,
     ) -> Result<(), RuntimeError> {
-        let Some(tail) = &self.tail else {
-            return Err(RuntimeError::RootEnvironmentRemoved);
-        };
-        tail.borrow_mut().define(name, value);
+        self.store.define(name, value);
         Ok(())
     }
+    // NOTE: this function is not used anywhere
     pub fn get(&self, name: &VariableToken) -> Option<Value> {
-        let mut tail = self.tail.clone();
-        while let Some(block) = tail.take() {
-            let block = block.borrow();
-            match block.get(name) {
-                Some(v) => return Some(v.clone()),
-                None => tail = block.parent.clone(),
+        self.store.get(name).cloned().or_else(|| {
+            let mut parent = self.parent.clone();
+            while let Some(block) = parent {
+                let env = block.borrow();
+                match env.get(name) {
+                    Some(v) => return Some(v),
+                    None => parent = env.parent.clone(),
+                }
             }
+            None
+        })
+    }
+    pub fn lookup(
+        &self,
+        name: &VariableToken,
+        hop: Option<usize>,
+    ) -> Option<Value> {
+        let num_hops = hop.unwrap_or(self.num_parents);
+        if num_hops == 0 {
+            return self.store.get(name).cloned();
         }
-        None
+        // first hop occurs here
+        let mut parent = self.parent.clone();
+        for _ in 1..=(num_hops - 1) {
+            let Some(block) = parent else {
+                break;
+            };
+            parent = block.borrow().parent.clone();
+        }
+        parent.and_then(|block| block.borrow().store.get(name).cloned())
     }
 
     pub fn assign(
@@ -149,37 +170,24 @@ impl Environment {
         name: &VariableToken,
         value: Value,
     ) -> Result<(), RuntimeError> {
-        let mut tail = self.tail.clone();
-        while let Some(block) = tail.take() {
+        if self.store.assign(name, value.clone()) {
+            return Ok(());
+        }
+        let mut parent = self.parent.clone();
+        while let Some(block) = parent {
             let mut block = block.borrow_mut();
-            match block.get(name) {
+            match block.store.get(name) {
                 Some(_) => {
-                    let result = block.assign(name, value);
+                    let result = block.store.assign(name, value);
                     assert!(result);
                     return Ok(());
                 }
                 None => {
-                    tail = block.parent.clone();
+                    parent = block.parent.clone();
                 }
             }
         }
         Err(RuntimeError::VariableNotFound(name.to_string()))
-    }
-
-    pub fn lookup(
-        &self,
-        name: &VariableToken,
-        hop: Option<usize>,
-    ) -> Option<Value> {
-        let num_hops = hop.unwrap_or(self.num_blocks - 1);
-        let mut tail = self.tail.clone();
-        for _ in 1..=num_hops {
-            let Some(block) = tail.take() else {
-                break;
-            };
-            tail = block.borrow().parent.clone();
-        }
-        tail.and_then(|block| block.borrow().get(name).cloned())
     }
     pub fn assign_at(
         &mut self,
@@ -187,16 +195,20 @@ impl Environment {
         value: Value,
         hop: Option<usize>,
     ) -> Result<(), RuntimeError> {
-        let num_hops = hop.unwrap_or(self.num_blocks - 1);
-        let mut tail = self.tail.clone();
-        for _ in 1..=num_hops {
-            let Some(block) = tail.take() else {
+        let num_hops = hop.unwrap_or(self.num_parents);
+        if num_hops == 0 {
+            return self.assign(name, value);
+        }
+        // first hop occurs here
+        let mut parent = self.parent.clone();
+        for _ in 1..=(num_hops - 1) {
+            let Some(block) = parent else {
                 break;
             };
-            tail = block.borrow().parent.clone();
+            parent = block.borrow().parent.clone();
         }
-        let block = tail.take().ok_or(RuntimeError::EnvironmentNotFound)?;
-        let result = block.borrow_mut().assign(name, value);
+        let block = parent.ok_or(RuntimeError::EnvironmentNotFound)?;
+        let result = block.borrow_mut().store.assign(name, value);
         assert!(result);
         Ok(())
     }
