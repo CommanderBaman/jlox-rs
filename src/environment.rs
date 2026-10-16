@@ -123,13 +123,8 @@ impl Environment {
             self.id, self.num_parents, self.store
         )
     }
-    pub fn define(
-        &mut self,
-        name: VariableToken,
-        value: Value,
-    ) -> Result<(), RuntimeError> {
+    pub fn define(&mut self, name: VariableToken, value: Value) {
         self.store.define(name, value);
-        Ok(())
     }
     // NOTE: this function is not used anywhere
     pub fn get(&self, name: &VariableToken) -> Option<Value> {

@@ -481,7 +481,11 @@ impl ExpressionVisitor<Result<Value, RuntimeError>> for Interpreter {
         let Value::ClassInstance(object) = &callee else {
             return Err(RuntimeError::NoProperties(callee));
         };
-        object.get(&expression.property, callee.clone())
+        object.get(
+            &expression.property,
+            callee.clone(),
+            self.environment.clone(),
+        )
     }
     fn visit_set(
         &mut self,
@@ -536,7 +540,7 @@ impl StatementVisitor<Result<Value, RuntimeError>> for Interpreter {
             .unwrap_or(Value::Uninitialized);
         self.environment
             .borrow_mut()
-            .define(statement.name.clone(), value.clone())?;
+            .define(statement.name.clone(), value.clone());
         Ok(value)
     }
     fn visit_block(
@@ -590,7 +594,7 @@ impl StatementVisitor<Result<Value, RuntimeError>> for Interpreter {
                 statement.clone(),
                 self.environment.clone(),
             )),
-        )?;
+        );
         Ok(Value::Nil)
     }
     fn visit_return(
@@ -611,7 +615,7 @@ impl StatementVisitor<Result<Value, RuntimeError>> for Interpreter {
     ) -> Result<Value, RuntimeError> {
         self.environment
             .borrow_mut()
-            .define(statement.name.clone(), Value::Nil)?;
+            .define(statement.name.clone(), Value::Nil);
         let class = Value::ClassDeclaration(Rc::new(LoxClass::new(
             statement.clone(),
             self.environment.clone(),

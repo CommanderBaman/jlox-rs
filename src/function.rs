@@ -27,15 +27,18 @@ pub struct LoxFunction {
 }
 
 impl LoxFunction {
-    // pub fn bind(&mut self, environment: Environment) {
-    //     self.environment = environment;
-    // }
     pub fn new(
         declaration: Rc<FunctionDeclarationStatement>,
         environment: InterpreterEnvironment,
     ) -> Rc<Self> {
         Rc::new(Self {
             declaration,
+            environment,
+        })
+    }
+    pub fn using(&self, environment: InterpreterEnvironment) -> Rc<Self> {
+        Rc::new(Self {
+            declaration: self.declaration.clone(),
             environment,
         })
     }
@@ -59,7 +62,6 @@ impl LoxCallable for LoxFunction {
         }
         let old_environment =
             interpreter.assign_environment(self.environment.clone());
-        // interpreter.environment.borrow_mut().push_child();
         interpreter.push_environment();
         for (name, arg) in
             self.declaration.parameters.iter().zip(arguments.iter())
@@ -67,10 +69,9 @@ impl LoxCallable for LoxFunction {
             interpreter
                 .environment
                 .borrow_mut()
-                .define(name.to_owned(), arg.to_owned())?;
+                .define(name.to_owned(), arg.to_owned());
         }
         let value = interpreter.visit_block(self.declaration.body.clone());
-        // interpreter.environment.borrow_mut().pop_child()?;
         interpreter.pop_environment()?;
         let _ = interpreter.assign_environment(old_environment);
         match value {
@@ -135,6 +136,6 @@ pub fn add_native_functions(
     interpreter.environment.borrow_mut().define(
         VariableToken::Identifier("clock".to_owned()),
         ClockFunction::as_value(),
-    )?;
+    );
     Ok(())
 }

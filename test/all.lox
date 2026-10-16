@@ -200,3 +200,46 @@ print x() == "hello2";
 print "closure 3 - third modifies second";
 print x() == "hello22";
 
+
+
+print "";
+print "-------------";
+print " Class Tests ";
+print "-------------";
+
+
+class Food {
+    eat() {
+        return "Swallow!";
+    }
+}
+
+var f = Food();
+print "can access class method";
+print f.eat() == "Swallow!";
+
+print "chaining of classes is allowed";
+print Food().eat() == "Swallow!";
+
+
+f.name = "tomato";
+print "can access stored variables";
+print f.name == "tomato";
+
+class Thing {
+  getCallback() {
+    fun localFunction() {
+      return this;
+    }
+    return localFunction;
+  }
+}
+
+var t = Thing();
+var callback = t.getCallback();
+t.x = "value";
+
+print "binding of this in class closures";
+print callback().x == "value";
+
+

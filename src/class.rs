@@ -35,7 +35,7 @@ impl LoxClass {
     }
 }
 
-impl std::fmt::Display for LoxClass {
+impl Display for LoxClass {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} class", self.name)
     }
@@ -85,6 +85,7 @@ impl LoxInstance {
         &self,
         property: &VariableToken,
         this_value: Value,
+        environment: InterpreterEnvironment,
     ) -> Result<Value, RuntimeError> {
         self.fields
             .borrow()
@@ -92,7 +93,10 @@ impl LoxInstance {
             .cloned()
             .or_else(|| {
                 self.class.get_method(property).map(|f| {
-                    Value::Call(Rc::new(LoxMethod::new(f, this_value)))
+                    environment
+                        .borrow_mut()
+                        .define(VariableToken::This, this_value);
+                    Value::Call(f.using(environment))
                 })
             })
             .ok_or(RuntimeError::PropertyNotFound(
@@ -104,7 +108,8 @@ impl LoxInstance {
         self.fields.borrow_mut().insert(property, value);
     }
 }
-impl std::fmt::Display for LoxInstance {
+
+impl Display for LoxInstance {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let fields_string = self
             .fields
@@ -118,48 +123,5 @@ impl std::fmt::Display for LoxInstance {
             "{} instance with fields {{ {}}}",
             self.class.name, fields_string
         )
-    }
-}
-
-#[derive(Debug)]
-pub struct LoxMethod {
-    declaration: Rc<LoxFunction>,
-    instance: Value,
-}
-
-impl LoxMethod {
-    fn new(declaration: Rc<LoxFunction>, instance: Value) -> Self {
-        Self {
-            declaration,
-            instance,
-        }
-    }
-}
-
-impl LoxCallable for LoxMethod {
-    fn arity(&self) -> usize {
-        self.declaration.arity()
-    }
-    fn call(
-        &self,
-        interpreter: &mut Interpreter,
-        arguments: Vec<Value>,
-    ) -> Result<Value, RuntimeError> {
-        // interpreter.environment.borrow_mut().push_child();
-        interpreter.push_environment();
-        interpreter
-            .environment
-            .borrow_mut()
-            .define(VariableToken::This, self.instance.clone())?;
-        let value = self.declaration.call(interpreter, arguments);
-        // interpreter.environment.borrow_mut().pop_child()?;
-        interpreter.pop_environment()?;
-        value
-    }
-}
-
-impl Display for LoxMethod {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.declaration)
     }
 }

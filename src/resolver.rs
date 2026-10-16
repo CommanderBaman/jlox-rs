@@ -15,6 +15,8 @@ use crate::{
 // expression
 // this makes it so that if I use clone in my workflow, it will not be correct
 // SCARY
+// Edit: If I clone badly among all these clones, I will be incorrect.
+// The type system needs to be correct here to avoid all this.
 pub trait Address {
     fn addr(&self) -> usize {
         let x = &raw const *self;

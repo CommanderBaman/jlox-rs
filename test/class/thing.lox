@@ -1,12 +1,16 @@
 class Thing {
   getCallback() {
     fun localFunction() {
-      print this;
+      return this;
     }
-
     return localFunction;
   }
 }
 
-var callback = Thing().getCallback();
-callback();
+var t = Thing();
+var callback = t.getCallback();
+print callback();
+
+t.x = "value";
+print callback();
+
