@@ -30,6 +30,7 @@ impl Address for expression::ThisExpression {}
 enum FunctionKind {
     None,
     Function,
+    Initializer,
     Method,
 }
 
@@ -379,6 +380,9 @@ impl StatementVisitor<Result<(), ResolverError>> for Resolver<'_> {
             return Err(ResolverError::TopLevelReturn);
         }
         if let Some(expression) = &statement.value {
+            if matches!(self.current_function, FunctionKind::Initializer) {
+                return Err(ResolverError::InvalidReturnFromInitializer);
+            }
             self.resolve_expression(expression)?;
         }
         Ok(())
@@ -402,7 +406,13 @@ impl StatementVisitor<Result<(), ResolverError>> for Resolver<'_> {
         self.declare(VariableToken::This)?;
         self.define(VariableToken::This)?;
         for function in statement.functions.clone() {
-            self.resolve_function(function, FunctionKind::Method)?;
+            let kind = match &function.name {
+                VariableToken::Identifier(name) if name == "init" => {
+                    FunctionKind::Initializer
+                }
+                _ => FunctionKind::Method,
+            };
+            self.resolve_function(function, kind)?;
         }
         self.end_scope()?;
         self.current_class = enclosing_class;

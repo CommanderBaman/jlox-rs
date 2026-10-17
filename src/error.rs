@@ -29,6 +29,8 @@ pub enum ResolverError {
     Unknown(String),
     #[error("invalid usage of this")]
     InvalidThis,
+    #[error("invalid return from initializer")]
+    InvalidReturnFromInitializer,
 }
 
 #[derive(Error, Debug)]
