@@ -603,6 +603,7 @@ impl StatementVisitor<Result<Value, RuntimeError>> for Interpreter {
             Value::Call(LoxFunction::new(
                 statement.clone(),
                 self.environment.clone(),
+                false,
             )),
         );
         Ok(Value::Nil)

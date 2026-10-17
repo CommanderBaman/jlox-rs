@@ -1,7 +1,10 @@
 class Foo {
   init(a) {
     this.a = a;
-    print this;
+    return a;
+  }
+  eat() {
+    print "eating " + this.a;
   }
 }
 
@@ -9,3 +12,8 @@ var foo = Foo("ab");
 print foo.init("help");
 
 print foo;
+foo.init("maybe");
+print foo;
+
+foo.eat();
+

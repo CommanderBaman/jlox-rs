@@ -24,21 +24,25 @@ pub trait LoxCallable: Display + Debug {
 pub struct LoxFunction {
     declaration: Rc<FunctionDeclarationStatement>,
     environment: InterpreterEnvironment,
+    is_initializer: bool,
 }
 
 impl LoxFunction {
     pub fn new(
         declaration: Rc<FunctionDeclarationStatement>,
         environment: InterpreterEnvironment,
+        is_initializer: bool,
     ) -> Rc<Self> {
         Rc::new(Self {
             declaration,
             environment,
+            is_initializer,
         })
     }
     pub fn using(&self, environment: InterpreterEnvironment) -> Rc<Self> {
         Rc::new(Self {
             declaration: self.declaration.clone(),
+            is_initializer: self.is_initializer,
             environment,
         })
     }
@@ -74,9 +78,17 @@ impl LoxCallable for LoxFunction {
         let value = interpreter.visit_block(self.declaration.body.clone());
         interpreter.pop_environment()?;
         let _ = interpreter.assign_environment(old_environment);
-        match value {
-            Err(RuntimeError::Return(v)) => Ok(v),
-            v => v,
+        if self.is_initializer {
+            Ok(interpreter
+                .environment
+                .borrow()
+                .get(&VariableToken::This)
+                .expect("this to be defined in an init call"))
+        } else {
+            match value {
+                Err(RuntimeError::Return(v)) => Ok(v),
+                v => v,
+            }
         }
     }
 }
@@ -85,9 +97,15 @@ impl Display for LoxFunction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // NOTE: can not print whole environment or will be stuck in
         // recursive loop
+        let initializer_string = if self.is_initializer {
+            String::from("initializer ")
+        } else {
+            String::new()
+        };
         write!(
             f,
-            "[call ({}) in environment with id {})]",
+            "[{}call ({}) in environment with id {})]",
+            initializer_string,
             self.declaration,
             self.environment.borrow().id
         )

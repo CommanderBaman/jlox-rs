@@ -22,7 +22,13 @@ impl LoxClass {
         for method in &declaration.functions {
             methods.insert(
                 method.name.clone(),
-                LoxFunction::new(method.clone(), environment.clone()),
+                LoxFunction::new(
+                    method.clone(),
+                    environment.clone(),
+                    method
+                        .name
+                        .eq(&VariableToken::Identifier("init".to_string())),
+                ),
             );
         }
         Self {
