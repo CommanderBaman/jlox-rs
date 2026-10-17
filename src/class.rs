@@ -122,13 +122,18 @@ impl LoxInstance {
         interpreter: &mut Interpreter,
         arguments: Vec<Value>,
     ) -> Result<(), RuntimeError> {
-        let init_call = self.get(
+        match self.get(
             &VariableToken::Identifier("init".to_string()),
             this_value,
             interpreter.environment.clone(),
-        )?;
-        init_call.call(interpreter, arguments)?;
-        Ok(())
+        ) {
+            Ok(call) => {
+                call.call(interpreter, arguments)?;
+                Ok(())
+            }
+            Err(RuntimeError::PropertyNotFound(_, _)) => Ok(()),
+            Err(e) => Err(e),
+        }
     }
 }
 
