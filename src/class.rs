@@ -43,7 +43,10 @@ impl Display for LoxClass {
 
 impl LoxCallable for LoxClass {
     fn arity(&self) -> usize {
-        0
+        self.methods
+            .get(&VariableToken::Identifier("init".to_string()))
+            .map(|f| f.arity())
+            .unwrap_or(0)
     }
     fn call(
         &self,
@@ -106,6 +109,20 @@ impl LoxInstance {
     }
     pub fn set(&self, property: VariableToken, value: Value) {
         self.fields.borrow_mut().insert(property, value);
+    }
+    pub fn init(
+        &self,
+        this_value: Value,
+        interpreter: &mut Interpreter,
+        arguments: Vec<Value>,
+    ) -> Result<(), RuntimeError> {
+        let init_call = self.get(
+            &VariableToken::Identifier("init".to_string()),
+            this_value,
+            interpreter.environment.clone(),
+        )?;
+        init_call.call(interpreter, arguments)?;
+        Ok(())
     }
 }
 

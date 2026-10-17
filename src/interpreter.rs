@@ -60,18 +60,28 @@ impl Value {
     fn is_truthy(&self) -> bool {
         !matches!(self, Value::Uninitialized | Value::Nil | Value::Bool(false))
     }
-    fn call(
+    pub fn call(
         &self,
         interpreter: &mut Interpreter,
         mut arguments: Vec<Self>,
     ) -> Result<Self, RuntimeError> {
         match self {
-            Value::Call(c) => c.call(interpreter, arguments),
-            Value::ClassDeclaration(c) => {
+            Self::Call(c) => c.call(interpreter, arguments),
+            Self::ClassDeclaration(c) => {
                 // add reference to self in the end because
                 // we need a reference to main class in instance
                 arguments.push(self.clone());
-                c.call(interpreter, arguments)
+                let value = c.call(interpreter, arguments.clone())?;
+                match value {
+                    Self::ClassInstance(ref i) => {
+                        arguments.pop();
+                        i.init(value.clone(), interpreter, arguments)?;
+                    }
+                    _ => unreachable!(
+                        "call to class declaration should produce its instance"
+                    ),
+                }
+                Ok(value)
             }
             _ => {
                 return Err(RuntimeError::NotCallable(self.to_string()));

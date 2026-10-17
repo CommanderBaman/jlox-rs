@@ -1,0 +1,11 @@
+class Foo {
+  init(a) {
+    this.a = a;
+    print this;
+  }
+}
+
+var foo = Foo("ab");
+print foo.init("help");
+
+print foo;
