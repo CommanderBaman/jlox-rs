@@ -36,9 +36,7 @@ use crate::{
 // parameters -> IDENTIFIER ( "," IDENTIFIER )*
 // returnStmt -> "return" expression? ";"
 // classDeclaration ->  "class" IDENTIFIER "{" function* "}"
-pub(super) fn parse(
-    tokens: &Vec<Token>,
-) -> Result<Vec<Statement>, LanguageError> {
+pub(super) fn parse(tokens: &[Token]) -> Result<Vec<Statement>, LanguageError> {
     let mut tokens = tokens.iter().peekable();
     let mut statements = Vec::new();
     let mut errors = Vec::new();
@@ -133,7 +131,7 @@ fn expression_statement(
     }
     // consume the ;
     _ = tokens.next();
-    Ok(ExpressionStatement::new(expression))
+    Ok(ExpressionStatement::build(expression))
 }
 
 // printStmt → "print" expression ";"
@@ -149,7 +147,7 @@ fn print_statement(
     }
     // consume the ;
     _ = tokens.next();
-    Ok(PrintStatement::new(expression))
+    Ok(PrintStatement::build(expression))
 }
 
 // variableDeclaration -> "var" IDENTIFIER ( "=" expression )? ";"
@@ -182,7 +180,7 @@ fn variable_declaration_statement(
     }
     _ = tokens.next();
 
-    language_error_wrap(VariableDeclarationStatement::new(
+    language_error_wrap(VariableDeclarationStatement::build(
         variable_token.clone(),
         expr,
     ))
@@ -234,7 +232,7 @@ fn function(
         ));
     }
     let body = block_statement(tokens)?;
-    language_error_wrap(FunctionDeclarationStatement::new(
+    language_error_wrap(FunctionDeclarationStatement::build(
         name.to_owned(),
         parameters,
         body,
@@ -275,7 +273,7 @@ fn block_statement(
         match token {
             Token::RightBrace => {
                 assert_matches!(tokens.next(), Some(Token::RightBrace));
-                return Ok(BlockStatement::new(statements));
+                return Ok(BlockStatement::build(statements));
             }
             _ => {
                 statements.push(declaration(tokens)?);
@@ -317,7 +315,7 @@ fn if_statement(
         _ = tokens.next();
         else_branch = Some(statement(tokens)?);
     }
-    Ok(IfStatement::new(condition, then_branch, else_branch))
+    Ok(IfStatement::build(condition, then_branch, else_branch))
 }
 
 // whileStmt -> "while" "(" expression ")" statement
@@ -339,7 +337,7 @@ fn while_statement(
         ));
     }
     let body = statement(tokens)?;
-    Ok(WhileStatement::new(condition, body))
+    Ok(WhileStatement::build(condition, body))
 }
 
 // forStmt -> "for" "(" varDecl | exprStmt | ";" )
@@ -398,17 +396,19 @@ fn for_statement(
     //   }
     // }
     if let Some(increment) = increment {
-        body =
-            BlockStatement::new(vec![body, ExpressionStatement::new(increment)])
+        body = BlockStatement::build(vec![
+            body,
+            ExpressionStatement::build(increment),
+        ])
     }
     // WARN: this means if we do not use the break keyword, this loop will
     // go till infinity? That is a problem, a BIG problem
     let condition = condition
-        .unwrap_or(language_error_wrap(LiteralExpression::new(Token::True))?);
-    body = WhileStatement::new(condition, body);
+        .unwrap_or(language_error_wrap(LiteralExpression::build(Token::True))?);
+    body = WhileStatement::build(condition, body);
 
     if let Some(initializer) = initializer {
-        body = BlockStatement::new(vec![initializer, body]);
+        body = BlockStatement::build(vec![initializer, body]);
     }
 
     Ok(body)
@@ -430,7 +430,7 @@ fn return_statement(
                 .unwrap_or("unreachable".to_string())
         )));
     }
-    Ok(ReturnStatement::new(expr))
+    Ok(ReturnStatement::build(expr))
 }
 
 // classDeclaration ->  "class" IDENTIFIER ( "<" IDENTIFIER )? "{" function* "}"
@@ -451,7 +451,7 @@ fn class_declaration_statement(
         match tokens.next_if(|t| matches!(t, Token::Identifier(_))) {
             Some(t) => {
                 superclass = Some(language_error_wrap(
-                    VariableExpression::build(t.clone()),
+                    VariableExpression::new(t.clone()),
                 )?);
             }
             _ => {
@@ -480,7 +480,7 @@ fn class_declaration_statement(
         ));
     }
 
-    language_error_wrap(ClassDeclarationStatement::new(
+    language_error_wrap(ClassDeclarationStatement::build(
         name.to_owned(),
         functions,
         superclass,
@@ -502,15 +502,15 @@ fn class_declaration_statement(
 //              | "(" expression ")" | IDENTIFIER | "this"
 //              | "super" "." IDENTIFIER
 pub(super) fn parse_expression(
-    tokens: &Vec<Token>,
+    tokens: &[Token],
 ) -> Result<Expression, LanguageError> {
     let mut tokens = tokens.iter().peekable();
     let mut errors = Vec::new();
     // add a dummy expression for rust checks
     // I can put in anything and it would work
-    let mut expr: Expression = LiteralExpression::new(Token::Nil)
+    let mut expr: Expression = LiteralExpression::build(Token::Nil)
         .expect("nil is a literal expression");
-    while let Some(_) = tokens.peek() {
+    while tokens.peek().is_some() {
         match expression(&mut tokens) {
             Ok(ex) => expr = ex,
             Err(err) => {
@@ -589,7 +589,7 @@ fn logic_or(
                 let left_expression = expr;
                 let token = token.unwrap();
                 let right_expression = logic_and(tokens)?;
-                expr = language_error_wrap(LogicalExpression::new(
+                expr = language_error_wrap(LogicalExpression::build(
                     left_expression,
                     token.to_owned(),
                     right_expression,
@@ -616,7 +616,7 @@ fn logic_and(
                 let left_expression = expr;
                 let token = token.unwrap();
                 let right_expression = equality(tokens)?;
-                expr = language_error_wrap(LogicalExpression::new(
+                expr = language_error_wrap(LogicalExpression::build(
                     left_expression,
                     token.to_owned(),
                     right_expression,
@@ -643,7 +643,7 @@ fn equality(
                     .next()
                     .expect("no token after peek check - equality");
                 let right_expression = comparison(tokens)?;
-                expression = language_error_wrap(BinaryExpression::new(
+                expression = language_error_wrap(BinaryExpression::build(
                     left_expression,
                     operator.to_owned(),
                     right_expression,
@@ -671,7 +671,7 @@ fn comparison(
                     .next()
                     .expect("no token after peek check - comparison");
                 let right_expression = term(tokens)?;
-                expression = language_error_wrap(BinaryExpression::new(
+                expression = language_error_wrap(BinaryExpression::build(
                     left_expression,
                     operator.to_owned(),
                     right_expression,
@@ -693,7 +693,7 @@ fn term(tokens: &mut Peekable<Iter<Token>>) -> Result<Expression, ParseError> {
                 let operator =
                     tokens.next().expect("no token after peek check - term");
                 let right_expression = factor(tokens)?;
-                expression = language_error_wrap(BinaryExpression::new(
+                expression = language_error_wrap(BinaryExpression::build(
                     left_expression,
                     operator.to_owned(),
                     right_expression,
@@ -717,7 +717,7 @@ fn factor(
                 let operator =
                     tokens.next().expect("no token after peek check - factor");
                 let right_expression = unary(tokens)?;
-                expression = language_error_wrap(BinaryExpression::new(
+                expression = language_error_wrap(BinaryExpression::build(
                     left_expression,
                     operator.to_owned(),
                     right_expression,
@@ -735,7 +735,7 @@ fn unary(tokens: &mut Peekable<Iter<Token>>) -> Result<Expression, ParseError> {
         Some(Token::Bang) | Some(Token::Minus) => {
             let token =
                 tokens.next().expect("no token after peek check - unary");
-            language_error_wrap(UnaryExpression::new(
+            language_error_wrap(UnaryExpression::build(
                 token.to_owned(),
                 unary(tokens)?,
             ))
@@ -754,18 +754,17 @@ fn call(tokens: &mut Peekable<Iter<Token>>) -> Result<Expression, ParseError> {
             // callExpr -> "(" arguments? ")"
             Some(Token::LeftParen) => {
                 assert_matches!(tokens.next(), Some(Token::LeftParen));
-                call_string =
-                    call_string + Token::LeftParen.to_string().as_str();
+                call_string += Token::LeftParen.to_string().as_str();
 
                 // if no arguments
                 if matches!(tokens.peek(), Some(Token::RightParen)) {
                     assert_matches!(tokens.next(), Some(Token::RightParen));
-                    expr = CallExpression::new(expr, vec![]);
+                    expr = CallExpression::build(expr, vec![]);
                     continue;
                 }
 
                 let arguments = arguments(tokens)?;
-                expr = CallExpression::new(expr, arguments);
+                expr = CallExpression::build(expr, arguments);
 
                 if !matches!(tokens.peek(), Some(Token::RightParen)) {
                     call_string = call_string
@@ -781,13 +780,13 @@ fn call(tokens: &mut Peekable<Iter<Token>>) -> Result<Expression, ParseError> {
             // getExpr -> "." IDENTIFIER
             Some(Token::Dot) => {
                 assert_matches!(tokens.next(), Some(Token::Dot));
-                call_string = call_string + Token::Dot.to_string().as_str();
+                call_string += Token::Dot.to_string().as_str();
 
                 if !matches!(tokens.peek(), Some(Token::Identifier(_))) {
                     return Err(ParseError::MalformedGet(call_string));
                 }
                 let property = tokens.next().unwrap();
-                expr = language_error_wrap(GetExpression::new(
+                expr = language_error_wrap(GetExpression::build(
                     expr,
                     property.clone(),
                 ))?;
@@ -832,10 +831,10 @@ fn primary(
         | Token::Nil
         | Token::Number(_)
         | Token::String(_) => {
-            language_error_wrap(LiteralExpression::new(token.to_owned()))
+            language_error_wrap(LiteralExpression::build(token.to_owned()))
         }
         Token::This => {
-            language_error_wrap(ThisExpression::new(token.to_owned()))
+            language_error_wrap(ThisExpression::build(token.to_owned()))
         }
         Token::LeftParen => {
             let expression = expression(tokens)?;
@@ -843,10 +842,10 @@ fn primary(
             if !matches!(tokens.next(), Some(Token::RightParen)) {
                 return Err(ParseError::IncompletePrimaryExpression);
             }
-            Ok(GroupingExpression::new(expression))
+            Ok(GroupingExpression::build(expression))
         }
         Token::Identifier(_) => {
-            language_error_wrap(VariableExpression::new(token.to_owned()))
+            language_error_wrap(VariableExpression::build(token.to_owned()))
         }
         Token::Super => {
             if tokens.next_if(|t| matches!(t, Token::Dot)).is_none() {
@@ -861,7 +860,7 @@ fn primary(
                     "no method after super keyword".to_string(),
                 ));
             };
-            language_error_wrap(SuperExpression::new(
+            language_error_wrap(SuperExpression::build(
                 token.to_owned(),
                 method.to_owned(),
             ))

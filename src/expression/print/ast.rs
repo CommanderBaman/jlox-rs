@@ -12,7 +12,7 @@ impl SimpleAstPrinter {
     pub fn new() -> Self {
         Self {}
     }
-    pub fn to_string(&mut self, expression: &Expression) -> String {
+    pub fn form_string(&mut self, expression: &Expression) -> String {
         expression.accept(self)
     }
 }
@@ -96,12 +96,12 @@ mod test {
     fn ast_printer_literal() {
         let expressions = vec![
             (
-                LiteralExpression::new(Token::True)
+                LiteralExpression::build(Token::True)
                     .expect("true literal correct conversion"),
                 "true",
             ),
             (
-                LiteralExpression::new(Token::False)
+                LiteralExpression::build(Token::False)
                     .expect("false literal correct conversion"),
                 "false",
             ),
@@ -109,7 +109,7 @@ mod test {
 
         let mut printer = SimpleAstPrinter::new();
         for (expression, result) in expressions {
-            assert_eq!(result, printer.to_string(&expression))
+            assert_eq!(result, printer.form_string(&expression))
         }
     }
 
@@ -117,15 +117,15 @@ mod test {
     fn ast_printer_group() {
         let expressions = vec![
             (
-                GroupingExpression::new(
-                    LiteralExpression::new(Token::True)
+                GroupingExpression::build(
+                    LiteralExpression::build(Token::True)
                         .expect("true literal correct conversion"),
                 ),
                 "(group true)",
             ),
             (
-                GroupingExpression::new(
-                    LiteralExpression::new(Token::False)
+                GroupingExpression::build(
+                    LiteralExpression::build(Token::False)
                         .expect("false literal correct conversion"),
                 ),
                 "(group false)",
@@ -134,27 +134,30 @@ mod test {
 
         let mut printer = SimpleAstPrinter::new();
         for (expression, result) in expressions {
-            assert_eq!(result, printer.to_string(&expression))
+            assert_eq!(result, printer.form_string(&expression))
         }
     }
 
     #[test]
     fn ast_printer_provided_example() {
-        let expression = BinaryExpression::new(
-            UnaryExpression::new(
+        let expression = BinaryExpression::build(
+            UnaryExpression::build(
                 Token::Minus,
-                LiteralExpression::new(Token::Number(123.0))
+                LiteralExpression::build(Token::Number(123.0))
                     .expect("123 is literal"),
             )
             .expect("-123 is unary expression"),
             Token::Star,
-            GroupingExpression::new(
-                LiteralExpression::new(Token::Number(45.67))
+            GroupingExpression::build(
+                LiteralExpression::build(Token::Number(45.67))
                     .expect("45.67 is literal"),
             ),
         )
         .expect("-123 * (45.67) is a correct expression");
         let mut printer = SimpleAstPrinter::new();
-        assert_eq!(printer.to_string(&expression), "(* (- 123) (group 45.67))");
+        assert_eq!(
+            printer.form_string(&expression),
+            "(* (- 123) (group 45.67))"
+        );
     }
 }

@@ -136,16 +136,14 @@ impl LoxInstance {
                 .lookup(&VariableToken::This, Some(0))
                 .is_some()
         );
-        let value =
-            match self.get(&VariableToken::Identifier("init".to_string())) {
-                Ok(call) => {
-                    call.call(interpreter, arguments)?;
-                    Ok(())
-                }
-                Err(RuntimeError::PropertyNotFound(_, _)) => Ok(()),
-                Err(e) => Err(e),
-            };
-        value
+        match self.get(&VariableToken::Identifier("init".to_string())) {
+            Ok(call) => {
+                call.call(interpreter, arguments)?;
+                Ok(())
+            }
+            Err(RuntimeError::PropertyNotFound(_, _)) => Ok(()),
+            Err(e) => Err(e),
+        }
     }
     pub fn environment(&self) -> InterpreterEnvironment {
         // 'this' is defined

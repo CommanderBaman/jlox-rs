@@ -182,11 +182,11 @@ pub fn scan_tokens(line: &str) -> Result<Vec<Token>, LanguageError> {
             // literals
             c => {
                 // numbers
-                if c.is_digit(10) {
+                if c.is_ascii_digit() {
                     let mut buffer = String::new();
                     buffer.push(c);
                     while let Some(&p) = chars.peek() {
-                        if p == '.' || p.is_digit(10) {
+                        if p == '.' || p.is_ascii_digit() {
                             chars.next();
                             buffer.push(p);
                             continue;

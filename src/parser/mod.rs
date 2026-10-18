@@ -7,12 +7,10 @@ use crate::{
 
 mod recursive_descent;
 
-pub fn parse_expression(
-    tokens: &Vec<Token>,
-) -> Result<Expression, LanguageError> {
-    recursive_descent::parse_expression(&tokens)
+pub fn parse_expression(tokens: &[Token]) -> Result<Expression, LanguageError> {
+    recursive_descent::parse_expression(tokens)
 }
 
-pub fn parse(tokens: &Vec<Token>) -> Result<Vec<Statement>, LanguageError> {
-    recursive_descent::parse(&tokens)
+pub fn parse(tokens: &[Token]) -> Result<Vec<Statement>, LanguageError> {
+    recursive_descent::parse(tokens)
 }

@@ -117,7 +117,7 @@ pub struct ExpressionStatement {
 }
 
 impl ExpressionStatement {
-    pub fn new(expression: Expression) -> Statement {
+    pub fn build(expression: Expression) -> Statement {
         Statement::Expression(Rc::new(Self { expression }))
     }
 }
@@ -135,7 +135,7 @@ pub struct PrintStatement {
 }
 
 impl PrintStatement {
-    pub fn new(expression: Expression) -> Statement {
+    pub fn build(expression: Expression) -> Statement {
         Statement::Print(Rc::new(Self { expression }))
     }
 }
@@ -154,7 +154,7 @@ pub struct VariableDeclarationStatement {
 }
 
 impl VariableDeclarationStatement {
-    pub fn new(
+    pub fn build(
         name: Token,
         expression: Option<Expression>,
     ) -> Result<Statement, LanguageError> {
@@ -182,7 +182,7 @@ pub struct BlockStatement {
 }
 
 impl BlockStatement {
-    pub fn new(statements: Vec<Statement>) -> Statement {
+    pub fn build(statements: Vec<Statement>) -> Statement {
         Statement::Block(Rc::new(Self {
             statements: statements.into_iter().map(Rc::new).collect(),
         }))
@@ -212,7 +212,7 @@ pub struct IfStatement {
 }
 
 impl IfStatement {
-    pub fn new(
+    pub fn build(
         condition: Expression,
         then_branch: Statement,
         else_branch: Option<Statement>,
@@ -220,7 +220,7 @@ impl IfStatement {
         Statement::If(Rc::new(Self {
             condition,
             then_branch: Rc::new(then_branch),
-            else_branch: else_branch.map(|b| Rc::new(b)),
+            else_branch: else_branch.map(Rc::new),
         }))
     }
 }
@@ -247,7 +247,7 @@ pub struct WhileStatement {
 }
 
 impl WhileStatement {
-    pub fn new(condition: Expression, body: Statement) -> Statement {
+    pub fn build(condition: Expression, body: Statement) -> Statement {
         Statement::While(Rc::new(Self {
             condition,
             body: Rc::new(body),
@@ -272,7 +272,7 @@ pub struct FunctionDeclarationStatement {
 }
 
 impl FunctionDeclarationStatement {
-    pub fn new(
+    pub fn build(
         name: Token,
         parameters: Vec<Token>,
         body: Statement,
@@ -280,7 +280,7 @@ impl FunctionDeclarationStatement {
         let name = name.try_into()?;
         let parameters: Vec<VariableToken> = parameters
             .into_iter()
-            .map(|p| <Token as TryInto<VariableToken>>::try_into(p))
+            .map(<Token as TryInto<VariableToken>>::try_into)
             .collect::<Result<Vec<VariableToken>, LanguageError>>()?;
         let Statement::Block(body) = body else {
             return Err(LanguageError::IncorrectStatementConversion {
@@ -319,7 +319,7 @@ pub struct ReturnStatement {
 }
 
 impl ReturnStatement {
-    pub fn new(value: Option<Expression>) -> Statement {
+    pub fn build(value: Option<Expression>) -> Statement {
         Statement::Return(Rc::new(Self { value }))
     }
 }
@@ -348,7 +348,7 @@ pub struct ClassDeclarationStatement {
 }
 
 impl ClassDeclarationStatement {
-    pub fn new(
+    pub fn build(
         name: Token,
         functions: Vec<Statement>,
         superclass: Option<VariableExpression>,

@@ -122,7 +122,7 @@ impl LiteralExpression {
     pub fn wrap(self) -> Expression {
         Expression::Literal(self)
     }
-    pub fn new(token: Token) -> Result<Expression, LanguageError> {
+    pub fn build(token: Token) -> Result<Expression, LanguageError> {
         let literal = token.try_into()?;
         Ok(Expression::Literal(Self { literal }))
     }
@@ -143,7 +143,7 @@ impl GroupingExpression {
     pub fn wrap(self) -> Expression {
         Expression::Grouping(self)
     }
-    pub fn new(expression: Expression) -> Expression {
+    pub fn build(expression: Expression) -> Expression {
         Expression::Grouping(Self {
             expression: Rc::new(expression),
         })
@@ -186,7 +186,7 @@ impl UnaryExpression {
     pub fn wrap(self) -> Expression {
         Expression::Unary(self)
     }
-    pub fn new(
+    pub fn build(
         token: Token,
         expression: Expression,
     ) -> Result<Expression, LanguageError> {
@@ -259,7 +259,7 @@ impl BinaryExpression {
     pub fn wrap(self) -> Expression {
         Expression::Binary(self)
     }
-    pub fn new(
+    pub fn build(
         left_expression: Expression,
         token: Token,
         right_expression: Expression,
@@ -314,7 +314,7 @@ impl LogicalExpression {
     pub fn wrap(self) -> Expression {
         Expression::Logical(self)
     }
-    pub fn new(
+    pub fn build(
         left_expression: Expression,
         token: Token,
         right_expression: Expression,
@@ -368,11 +368,11 @@ impl VariableExpression {
     pub fn wrap(self) -> Expression {
         Expression::Variable(self)
     }
-    pub fn new(token: Token) -> Result<Expression, LanguageError> {
+    pub fn build(token: Token) -> Result<Expression, LanguageError> {
         let variable = token.try_into()?;
         Ok(Expression::Variable(Self { variable }))
     }
-    pub fn build(token: Token) -> Result<Self, LanguageError> {
+    pub fn new(token: Token) -> Result<Self, LanguageError> {
         let variable = token.try_into()?;
         Ok(Self { variable })
     }
@@ -419,7 +419,7 @@ impl CallExpression {
     pub fn wrap(self) -> Expression {
         Expression::Call(self)
     }
-    pub fn new(callee: Expression, arguments: Vec<Expression>) -> Expression {
+    pub fn build(callee: Expression, arguments: Vec<Expression>) -> Expression {
         Expression::Call(Self {
             callee: Rc::new(callee),
             arguments,
@@ -442,7 +442,7 @@ impl GetExpression {
     pub fn wrap(self) -> Expression {
         Expression::Get(self)
     }
-    pub fn new(
+    pub fn build(
         callee: Expression,
         property: Token,
     ) -> Result<Expression, LanguageError> {
@@ -498,7 +498,7 @@ impl ThisExpression {
     pub fn wrap(self) -> Expression {
         Expression::This(self)
     }
-    pub fn new(token: Token) -> Result<Expression, LanguageError> {
+    pub fn build(token: Token) -> Result<Expression, LanguageError> {
         let this_token = token.clone().try_into()?;
         if !matches!(this_token, VariableToken::This) {
             return Err(LanguageError::IncorrectTokenConversion {
@@ -526,7 +526,7 @@ impl SuperExpression {
     pub fn wrap(self) -> Expression {
         Expression::Super(self)
     }
-    pub fn new(
+    pub fn build(
         token: Token,
         method: Token,
     ) -> Result<Expression, LanguageError> {

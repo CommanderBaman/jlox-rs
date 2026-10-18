@@ -12,7 +12,7 @@ impl RpnPrinter {
     pub fn new() -> Self {
         Self {}
     }
-    pub fn to_string(&mut self, expression: &Expression) -> String {
+    pub fn form_string(&mut self, expression: &Expression) -> String {
         expression.accept(self)
     }
 }
@@ -91,24 +91,24 @@ mod test {
 
     #[test]
     fn print_example() {
-        let expression = BinaryExpression::new(
-            GroupingExpression::new(
-                BinaryExpression::new(
-                    LiteralExpression::new(Token::Number(1.0))
+        let expression = BinaryExpression::build(
+            GroupingExpression::build(
+                BinaryExpression::build(
+                    LiteralExpression::build(Token::Number(1.0))
                         .expect("1 is literal"),
                     Token::Plus,
-                    LiteralExpression::new(Token::Number(2.0))
+                    LiteralExpression::build(Token::Number(2.0))
                         .expect("2 is literal"),
                 )
                 .expect("1 + 2 is binary expression"),
             ),
             Token::Star,
-            GroupingExpression::new(
-                BinaryExpression::new(
-                    LiteralExpression::new(Token::Number(4.0))
+            GroupingExpression::build(
+                BinaryExpression::build(
+                    LiteralExpression::build(Token::Number(4.0))
                         .expect("4 is literal"),
                     Token::Minus,
-                    LiteralExpression::new(Token::Number(3.0))
+                    LiteralExpression::build(Token::Number(3.0))
                         .expect("3 is literal"),
                 )
                 .expect("4 - 3 is binary expression"),
@@ -116,6 +116,6 @@ mod test {
         )
         .expect("(1 + 2) * (4 - 3) is expression");
         let mut printer = RpnPrinter::new();
-        assert_eq!(printer.to_string(&expression), "1 2 + 4 3 - *");
+        assert_eq!(printer.form_string(&expression), "1 2 + 4 3 - *");
     }
 }

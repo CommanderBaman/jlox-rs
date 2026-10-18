@@ -44,10 +44,10 @@ impl std::fmt::Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let string = match self {
             Self::Bool(b) => format!("{b}"),
-            Self::Nil => format!("nil"),
+            Self::Nil => "nil".to_string(),
             Self::Number(n) => format!("{n}"),
-            Self::String(s) => format!("{s}"),
-            Self::Uninitialized => format!("uinitialized"),
+            Self::String(s) => s.to_owned(),
+            Self::Uninitialized => "uinitialized".to_string(),
             Self::Call(c) => format!("{c}"),
             Self::ClassDeclaration(c) => format!("{c}"),
             Self::ClassInstance(c) => format!("{c}"),
@@ -91,9 +91,7 @@ impl Value {
                 }
                 Ok(value)
             }
-            _ => {
-                return Err(RuntimeError::NotCallable(self.to_string()));
-            }
+            _ => Err(RuntimeError::NotCallable(self.to_string())),
         }
     }
     fn environment(&self) -> InterpreterEnvironment {
@@ -127,11 +125,7 @@ impl PartialEq for Value {
 // block but could set it for Ord block
 impl PartialOrd for Value {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        match (self, other) {
-            (Value::Call(_), _) => None,
-            (_, Value::Call(_)) => None,
-            (l, r) => l.partial_cmp(r),
-        }
+        Some(self.cmp(other))
     }
 }
 
@@ -203,7 +197,7 @@ fn get_binary_expression(
     right: Value,
     operator: Token,
 ) -> Expression {
-    BinaryExpression::new(
+    BinaryExpression::build(
         Expression::Literal(left.try_into().expect("left value to be initialized")),
         operator,
         Expression::Literal(right.try_into().expect("right value to be initialized")),
