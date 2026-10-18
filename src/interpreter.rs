@@ -627,9 +627,21 @@ impl StatementVisitor<Result<Value, RuntimeError>> for Interpreter {
         self.environment
             .borrow_mut()
             .define(statement.name.clone(), Value::Nil);
+        let mut superclass = None;
+        if let Some(superclass_expression) = statement.superclass.as_ref() {
+            match self.visit_variable(superclass_expression)? {
+                Value::ClassDeclaration(s) => superclass = Some(s),
+                _ => {
+                    return Err(RuntimeError::InvalidSuperClass(
+                        statement.name.clone(),
+                    ));
+                }
+            }
+        }
         let class = Value::ClassDeclaration(Rc::new(LoxClass::new(
             statement.clone(),
             self.environment.clone(),
+            superclass,
         )));
         self.environment
             .borrow_mut()

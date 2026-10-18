@@ -4,7 +4,7 @@ use std::{fmt::Display, rc::Rc};
 
 use crate::{
     error::LanguageError,
-    expression::{Expression, VariableToken},
+    expression::{Expression, VariableExpression, VariableToken},
     token::Token,
 };
 
@@ -35,7 +35,7 @@ use crate::{
 // function -> IDENTIFIER "(" parameters? ")" blockStmt
 // parameters -> IDENTIFIER ( "," IDENTIFIER )*
 // returnStmt -> "return" expression? ";"
-// classDeclaration ->  "class" IDENTIFIER "{" function* "}"
+// classDeclaration ->  "class" IDENTIFIER ( "<" IDENTIFIER )? "{" function* "}"
 //
 // NOTE: forStmt is syntactic sugar for whileStmt
 #[derive(Debug, Clone)]
@@ -339,12 +339,16 @@ impl Display for ReturnStatement {
 pub struct ClassDeclarationStatement {
     pub name: VariableToken,
     pub functions: Vec<Rc<FunctionDeclarationStatement>>,
+    // I am confused as to keep variable expression or expression
+    // keeping variable expression as it feels correct
+    pub superclass: Option<VariableExpression>,
 }
 
 impl ClassDeclarationStatement {
     pub fn new(
         name: Token,
         functions: Vec<Statement>,
+        superclass: Option<VariableExpression>,
     ) -> Result<Statement, LanguageError> {
         let name = name.try_into()?;
         let functions = functions
@@ -357,7 +361,11 @@ impl ClassDeclarationStatement {
                 }),
             })
             .collect::<Result<Vec<Rc<FunctionDeclarationStatement>>, LanguageError>>()?;
-        Ok(Statement::Class(Rc::new(Self { name, functions })))
+        Ok(Statement::Class(Rc::new(Self {
+            name,
+            functions,
+            superclass,
+        })))
     }
 }
 

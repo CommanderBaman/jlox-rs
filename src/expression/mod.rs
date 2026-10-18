@@ -366,6 +366,10 @@ impl VariableExpression {
         let variable = token.try_into()?;
         Ok(Expression::Variable(Self { variable }))
     }
+    pub fn build(token: Token) -> Result<Self, LanguageError> {
+        let variable = token.try_into()?;
+        Ok(Self { variable })
+    }
 }
 
 impl std::fmt::Display for VariableExpression {

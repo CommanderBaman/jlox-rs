@@ -12,11 +12,13 @@ use crate::{
 pub struct LoxClass {
     name: VariableToken,
     methods: HashMap<VariableToken, Rc<LoxFunction>>,
+    superclass: Option<Rc<LoxClass>>,
 }
 impl LoxClass {
     pub fn new(
         declaration: Rc<ClassDeclarationStatement>,
         environment: InterpreterEnvironment,
+        superclass: Option<Rc<LoxClass>>,
     ) -> Self {
         let mut methods = HashMap::new();
         for method in &declaration.functions {
@@ -34,10 +36,13 @@ impl LoxClass {
         Self {
             name: declaration.name.clone(),
             methods,
+            superclass,
         }
     }
     fn get_method(&self, name: &VariableToken) -> Option<Rc<LoxFunction>> {
-        self.methods.get(name).cloned()
+        self.methods.get(name).cloned().or_else(|| {
+            self.superclass.as_ref().and_then(|c| c.get_method(name))
+        })
     }
 }
 

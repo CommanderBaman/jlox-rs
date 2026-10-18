@@ -402,6 +402,14 @@ impl StatementVisitor<Result<(), ResolverError>> for Resolver<'_> {
             mem::replace(&mut self.current_class, ClassKind::Class);
         self.declare(statement.name.clone())?;
         self.define(statement.name.clone())?;
+        if let Some(superclass) = statement.superclass.as_ref() {
+            if superclass.variable.eq(&statement.name) {
+                return Err(ResolverError::SelfInheritanceNotAllowed(
+                    statement.name.clone(),
+                ));
+            }
+            self.visit_variable(superclass)?;
+        }
         self.begin_scope();
         self.declare(VariableToken::This)?;
         self.define(VariableToken::This)?;

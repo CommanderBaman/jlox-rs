@@ -31,6 +31,8 @@ pub enum ResolverError {
     InvalidThis,
     #[error("invalid return from initializer")]
     InvalidReturnFromInitializer,
+    #[error("self inheritance is not allowed: {0}")]
+    SelfInheritanceNotAllowed(VariableToken),
 }
 
 #[derive(Error, Debug)]
@@ -70,6 +72,8 @@ pub enum RuntimeError {
     NotSettable(String),
     #[error("environment not found")]
     EnvironmentNotFound,
+    #[error("expected class value for superclass for class {0}")]
+    InvalidSuperClass(VariableToken),
 }
 
 #[derive(Error, Debug)]

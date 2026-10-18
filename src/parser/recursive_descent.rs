@@ -433,7 +433,7 @@ fn return_statement(
     Ok(ReturnStatement::new(expr))
 }
 
-// classDeclaration ->  "class" IDENTIFIER "{" function* "}"
+// classDeclaration ->  "class" IDENTIFIER ( "<" IDENTIFIER )? "{" function* "}"
 fn class_declaration_statement(
     tokens: &mut Peekable<Iter<Token>>,
 ) -> Result<Statement, ParseError> {
@@ -446,6 +446,22 @@ fn class_declaration_statement(
         ));
     }
     let name = tokens.next().unwrap();
+    let mut superclass: Option<VariableExpression> = None;
+    if tokens.next_if(|t| matches!(t, Token::Less)).is_some() {
+        match tokens.next_if(|t| matches!(t, Token::Identifier(_))) {
+            Some(t) => {
+                superclass = Some(language_error_wrap(
+                    VariableExpression::build(t.clone()),
+                )?);
+            }
+            _ => {
+                return Err(ParseError::MalformedDeclaration(
+                    "no identifier for superclass".to_string(),
+                ));
+            }
+        }
+    }
+
     // {
     if tokens.next_if(|t| matches!(t, Token::LeftBrace)).is_none() {
         return Err(ParseError::MalformedDeclaration(
@@ -467,6 +483,7 @@ fn class_declaration_statement(
     language_error_wrap(ClassDeclarationStatement::new(
         name.to_owned(),
         functions,
+        superclass,
     ))
 }
 // grammar
