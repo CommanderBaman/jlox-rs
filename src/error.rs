@@ -74,6 +74,8 @@ pub enum RuntimeError {
     EnvironmentNotFound,
     #[error("expected class value for superclass for class {0}")]
     InvalidSuperClass(VariableToken),
+    #[error("invalid super state: {0}")]
+    InvalidSuperState(String),
 }
 
 #[derive(Error, Debug)]

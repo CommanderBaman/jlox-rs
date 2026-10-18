@@ -21,6 +21,7 @@ pub enum Expression {
     Get(GetExpression),
     Set(SetExpression),
     This(ThisExpression),
+    Super(SuperExpression),
 }
 
 impl Display for Expression {
@@ -40,6 +41,7 @@ impl Display for Expression {
             Self::Get(e) => format!("{e}"),
             Self::Set(e) => format!("{e}"),
             Self::This(e) => format!("{e}"),
+            Self::Super(e) => format!("{e}"),
         };
 
         write!(f, "{}", string)
@@ -60,6 +62,7 @@ pub trait ExpressionVisitor<R> {
     fn visit_get(&mut self, expression: &GetExpression) -> R;
     fn visit_set(&mut self, expression: &SetExpression) -> R;
     fn visit_this(&mut self, expression: &ThisExpression) -> R;
+    fn visit_super(&mut self, expression: &SuperExpression) -> R;
 }
 
 impl Expression {
@@ -76,6 +79,7 @@ impl Expression {
             Expression::Get(l) => visitor.visit_get(l),
             Expression::Set(l) => visitor.visit_set(l),
             Expression::This(l) => visitor.visit_this(l),
+            Expression::Super(l) => visitor.visit_super(l),
         }
     }
 }
@@ -340,6 +344,7 @@ pub enum VariableToken {
     #[strum(to_string = "{0}")]
     Identifier(String),
     This,
+    Super,
 }
 impl TryFrom<Token> for VariableToken {
     type Error = LanguageError;
@@ -347,6 +352,7 @@ impl TryFrom<Token> for VariableToken {
         match token {
             Token::Identifier(i) => Ok(VariableToken::Identifier(i)),
             Token::This => Ok(VariableToken::This),
+            Token::Super => Ok(VariableToken::Super),
             _ => Err(LanguageError::IncorrectTokenConversion {
                 base_token: token,
                 converted_to: "VariableToken",
@@ -507,5 +513,46 @@ impl ThisExpression {
 impl Display for ThisExpression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "this")
+    }
+}
+
+// super -> "super" "." method
+#[derive(Clone, Debug)]
+pub struct SuperExpression {
+    pub keyword: VariableToken,
+    pub method: VariableToken,
+}
+impl SuperExpression {
+    pub fn wrap(self) -> Expression {
+        Expression::Super(self)
+    }
+    pub fn new(
+        token: Token,
+        method: Token,
+    ) -> Result<Expression, LanguageError> {
+        let this_token = token.clone().try_into()?;
+        if !matches!(this_token, VariableToken::Super) {
+            return Err(LanguageError::IncorrectTokenConversion {
+                base_token: token,
+                converted_to: "SuperToken",
+            });
+        }
+        let method_token = method.clone().try_into()?;
+        if !matches!(method_token, VariableToken::Identifier(_)) {
+            return Err(LanguageError::IncorrectTokenConversion {
+                base_token: method,
+                converted_to: "MethodToken",
+            });
+        }
+        Ok(Expression::Super(Self {
+            keyword: this_token,
+            method: method_token,
+        }))
+    }
+}
+
+impl Display for SuperExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "super.{}", self.method)
     }
 }

@@ -39,7 +39,7 @@ impl LoxClass {
             superclass,
         }
     }
-    fn get_method(&self, name: &VariableToken) -> Option<Rc<LoxFunction>> {
+    pub fn get_method(&self, name: &VariableToken) -> Option<Rc<LoxFunction>> {
         self.methods.get(name).cloned().or_else(|| {
             self.superclass.as_ref().and_then(|c| c.get_method(name))
         })

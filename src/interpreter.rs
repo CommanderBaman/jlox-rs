@@ -14,8 +14,8 @@ use crate::{
         AssignmentExpression, BinaryExpression, BinaryOperator, CallExpression,
         Expression, ExpressionVisitor, GetExpression, GroupingExpression,
         LiteralExpression, LiteralToken, LogicalExpression, LogicalOperator,
-        SetExpression, ThisExpression, UnaryExpression, UnaryOperator,
-        VariableExpression,
+        SetExpression, SuperExpression, ThisExpression, UnaryExpression,
+        UnaryOperator, VariableExpression, VariableToken,
     },
     function::{LoxCallable, LoxFunction},
     resolver::Address,
@@ -521,6 +521,45 @@ impl ExpressionVisitor<Result<Value, RuntimeError>> for Interpreter {
                 RuntimeError::VariableNotFound(expression.token.to_string())
             })
     }
+    fn visit_super(
+        &mut self,
+        expression: &SuperExpression,
+    ) -> Result<Value, RuntimeError> {
+        let addr = expression.addr();
+        let distance = self.locals.get(&addr).expect(
+            "super to be defined in environment when visiting super expression",
+        ).to_owned();
+        let Value::ClassDeclaration(superclass) = self
+            .environment
+            .borrow()
+            .lookup(&VariableToken::Super, Some(distance))
+            .ok_or(RuntimeError::InvalidSuperState(
+                "value of super to be defined when visiting super expression "
+                    .to_string(),
+            ))?
+        else {
+            return Err(RuntimeError::InvalidSuperState(
+                "super in environment is not a class".to_string(),
+            ));
+        };
+        let this_object = self
+            .environment
+            .borrow()
+            .lookup(&VariableToken::This, Some(distance - 1))
+            .ok_or(RuntimeError::InvalidSuperState(
+                "value of super's this to be defined when visiting super expression".to_string(),
+            ))?;
+        let method = superclass.get_method(&expression.method).ok_or(
+            RuntimeError::InvalidSuperState(format!(
+                "method on super ({}) is not defined {}",
+                superclass, expression.method
+            )),
+        )?;
+        self.environment
+            .borrow_mut()
+            .define(VariableToken::This, this_object);
+        Ok(Value::Call(method.using(self.environment.clone())))
+    }
 }
 
 impl StatementVisitor<Result<Value, RuntimeError>> for Interpreter {
@@ -627,22 +666,31 @@ impl StatementVisitor<Result<Value, RuntimeError>> for Interpreter {
         self.environment
             .borrow_mut()
             .define(statement.name.clone(), Value::Nil);
-        let mut superclass = None;
+        let mut superclass: Option<Rc<LoxClass>> = None;
         if let Some(superclass_expression) = statement.superclass.as_ref() {
-            match self.visit_variable(superclass_expression)? {
-                Value::ClassDeclaration(s) => superclass = Some(s),
+            let value = self.visit_variable(superclass_expression)?;
+            match &value {
+                Value::ClassDeclaration(s) => superclass = Some(s.clone()),
                 _ => {
                     return Err(RuntimeError::InvalidSuperClass(
                         statement.name.clone(),
                     ));
                 }
             }
+            self.push_environment();
+            self.environment
+                .borrow_mut()
+                .define(VariableToken::Super, value);
         }
+        let superclass_defined = superclass.is_some();
         let class = Value::ClassDeclaration(Rc::new(LoxClass::new(
             statement.clone(),
             self.environment.clone(),
             superclass,
         )));
+        if superclass_defined {
+            self.pop_environment()?;
+        }
         self.environment
             .borrow_mut()
             .assign(&statement.name, class)?;

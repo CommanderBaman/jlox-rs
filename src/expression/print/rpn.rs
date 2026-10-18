@@ -2,8 +2,8 @@
 
 use crate::expression::{
     AssignmentExpression, CallExpression, Expression, ExpressionVisitor,
-    GetExpression, LogicalExpression, SetExpression, ThisExpression,
-    VariableExpression,
+    GetExpression, LogicalExpression, SetExpression, SuperExpression,
+    ThisExpression, VariableExpression,
 };
 
 pub struct RpnPrinter {}
@@ -73,6 +73,9 @@ impl ExpressionVisitor<String> for RpnPrinter {
         unimplemented!()
     }
     fn visit_this(&mut self, _expression: &ThisExpression) -> String {
+        unimplemented!()
+    }
+    fn visit_super(&mut self, _expression: &SuperExpression) -> String {
         unimplemented!()
     }
 }

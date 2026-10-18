@@ -26,6 +26,7 @@ pub trait Address {
 impl Address for expression::VariableExpression {}
 impl Address for expression::AssignmentExpression {}
 impl Address for expression::ThisExpression {}
+impl Address for expression::SuperExpression {}
 
 enum FunctionKind {
     None,
@@ -130,7 +131,10 @@ impl<'a> Resolver<'a> {
                 // could use filter map but this is better
                 .filter(|(_, state)| !matches!(state, VariableState::Used))
                 .filter(|(variable, _)| {
-                    !matches!(variable, VariableToken::This)
+                    !matches!(
+                        variable,
+                        VariableToken::This | VariableToken::Super
+                    )
                 })
                 .map(|(variable, _)| variable)
                 .collect();
@@ -315,6 +319,13 @@ impl ExpressionVisitor<Result<(), ResolverError>> for Resolver<'_> {
         self.resolve_local(expression, &expression.token);
         Ok(())
     }
+    fn visit_super(
+        &mut self,
+        expression: &expression::SuperExpression,
+    ) -> Result<(), ResolverError> {
+        self.resolve_local(expression, &expression.keyword);
+        Ok(())
+    }
 }
 
 impl StatementVisitor<Result<(), ResolverError>> for Resolver<'_> {
@@ -409,6 +420,9 @@ impl StatementVisitor<Result<(), ResolverError>> for Resolver<'_> {
                 ));
             }
             self.visit_variable(superclass)?;
+            self.begin_scope();
+            self.declare(VariableToken::Super)?;
+            self.define(VariableToken::Super)?;
         }
         self.begin_scope();
         self.declare(VariableToken::This)?;
@@ -421,6 +435,9 @@ impl StatementVisitor<Result<(), ResolverError>> for Resolver<'_> {
                 _ => FunctionKind::Method,
             };
             self.resolve_function(function, kind)?;
+        }
+        if statement.superclass.is_some() {
+            self.end_scope()?;
         }
         self.end_scope()?;
         self.current_class = enclosing_class;

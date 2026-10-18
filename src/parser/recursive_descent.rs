@@ -5,8 +5,8 @@ use crate::{
     expression::{
         AssignmentExpression, BinaryExpression, CallExpression, Expression,
         GetExpression, GroupingExpression, LiteralExpression,
-        LogicalExpression, SetExpression, ThisExpression, UnaryExpression,
-        VariableExpression,
+        LogicalExpression, SetExpression, SuperExpression, ThisExpression,
+        UnaryExpression, VariableExpression,
     },
     statement::{
         BlockStatement, ClassDeclarationStatement, ExpressionStatement,
@@ -500,6 +500,7 @@ fn class_declaration_statement(
 // arguments  -> expression ( "," expression )*
 // primary    -> NUMBER | STRING | "true" | "false" | "nil"
 //              | "(" expression ")" | IDENTIFIER | "this"
+//              | "super" "." IDENTIFIER
 pub(super) fn parse_expression(
     tokens: &Vec<Token>,
 ) -> Result<Expression, LanguageError> {
@@ -816,8 +817,9 @@ fn arguments(
     Ok(expressions)
 }
 
-// primary → NUMBER | STRING | "true" | "false" | "nil"
-//          | "(" expression ")" | IDENTIFIER | "this"
+// primary -> NUMBER | STRING | "true" | "false" | "nil"
+//              | "(" expression ")" | IDENTIFIER | "this"
+//              | "super" "." IDENTIFIER
 fn primary(
     tokens: &mut Peekable<Iter<Token>>,
 ) -> Result<Expression, ParseError> {
@@ -845,6 +847,24 @@ fn primary(
         }
         Token::Identifier(_) => {
             language_error_wrap(VariableExpression::new(token.to_owned()))
+        }
+        Token::Super => {
+            if tokens.next_if(|t| matches!(t, Token::Dot)).is_none() {
+                return Err(ParseError::MalformedDeclaration(
+                    "no . after super keyword".to_string(),
+                ));
+            }
+            let Some(method) =
+                tokens.next_if(|t| matches!(t, Token::Identifier(_)))
+            else {
+                return Err(ParseError::MalformedDeclaration(
+                    "no method after super keyword".to_string(),
+                ));
+            };
+            language_error_wrap(SuperExpression::new(
+                token.to_owned(),
+                method.to_owned(),
+            ))
         }
         // FIX: cases found till now
         // 1 + ;
