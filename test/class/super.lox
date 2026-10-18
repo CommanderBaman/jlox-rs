@@ -1,4 +1,3 @@
-print "";
 class Doughnut {
   cook() {
     print "Fry until golden brown.";

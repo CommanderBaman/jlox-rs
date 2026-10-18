@@ -1,3 +1,5 @@
+var start = clock();
+
 print "------------------";
 print " Expression Tests ";
 print "------------------";
@@ -8,6 +10,8 @@ print 1 + 2 == 3;
 print "precedence: 1 + 2 * 3 + 4 / 2 == 9";
 print 1 + 2 * 3 + 4 / 2 == 9;
 
+var expressionTestTime = clock();
+
 print "";
 print "----------------------------";
 print " Variable Declaration Tests ";
@@ -16,6 +20,7 @@ var a = 2;
 print "a == 2";
 print a == 2;
 
+var variableDeclarationTime = clock();
 
 print "";
 print "-------------";
@@ -50,6 +55,8 @@ print b == "global b";
 print "c == 'global c'";
 print c == "global c";
 
+var blockTime = clock();
+
 
 print "";
 print "----------";
@@ -61,6 +68,8 @@ if (true) print true;
 
 print "basic else";
 if (false) print false; else print true;
+
+var ifTime = clock();
 
 print "";
 print "---------------";
@@ -96,6 +105,8 @@ print (false or true == false) == false;
 print "precedence: (F or T) == T is T";
 print ((false or true) == true) == true;
 
+var logicalTime = clock();
+
 print "";
 print "--------------";
 print " While Tests ";
@@ -107,6 +118,8 @@ print a == 0;
 while (a < 3) { a = a + 1;}
 print "a incremented to 3 in while";
 print a == 3;
+
+var whileTime = clock();
 
 print "";
 print "------------";
@@ -122,6 +135,8 @@ for (var b = 0; b < 4; b = b + 1) {
 // incremented to 6 because of sum of 0 + 1 + 2 + 3
 print "a incremented to 6 in for";
 print a == 6;
+
+var forTime = clock();
 
 print "";
 print "----------------";
@@ -201,6 +216,7 @@ print "closure 3 - third modifies second";
 print x() == "hello22";
 
 
+var functionTime = clock();
 
 print "";
 print "-------------";
@@ -225,21 +241,62 @@ print Food().eat() == "Swallow!";
 f.name = "tomato";
 print "can access stored variables";
 print f.name == "tomato";
-// 
-// class Thing {
-//   getCallback() {
-//     fun localFunction() {
-//       return this;
-//     }
-//     return localFunction;
-//   }
-// }
-// 
-// var t = Thing();
-// var callback = t.getCallback();
-// t.x = "value";
-// 
-// print "binding of this in class closures";
-// print callback().x == "value";
-// 
 
+class Thing {
+  getCallback() {
+    fun localFunction() {
+      return this;
+    }
+    return localFunction;
+  }
+}
+
+var t = Thing();
+var callback = t.getCallback();
+t.x = "value";
+
+print "binding of this in class closures";
+print callback().x == "value";
+
+class Doughnut {
+  cook(post) {
+    return "Fry until golden brown. " + post;
+  }
+}
+
+class BostonCream < Doughnut {
+  cook(pre) {
+    var a = super.cook(pre);
+    return a + pre + ". Pipe full of custard and coat with chocolate.";
+  }
+}
+
+var b = BostonCream();
+print "super with arguments work okay";
+print b.cook("sugar") == "Fry until golden brown. sugarsugar. Pipe full of custard and coat with chocolate.";
+
+
+// comment below if you do not want timing information
+var classTime = clock();
+var end = classTime;
+
+fun formatTime(end, start) {
+    return (end - start) + "ms";
+
+}
+
+
+print "";
+print "--------------------";
+print " Timing information ";
+print "--------------------";
+print " * expression tests: " + formatTime(expressionTestTime, start);
+print " * variable tests: " + formatTime(variableDeclarationTime, expressionTestTime);
+print " * block tests: " + formatTime(blockTime, variableDeclarationTime);
+print " * if tests: " + formatTime(ifTime, blockTime);
+print " * logical tests: " + formatTime(logicalTime, ifTime);
+print " * while tests: " + formatTime(whileTime, logicalTime);
+print " * for tests: " + formatTime(forTime, whileTime);
+print " * function tests: " + formatTime(functionTime, forTime);
+print " * class tests: " + formatTime(classTime, functionTime);
+print "Total: " + formatTime(end, start);

@@ -1,0 +1,16 @@
+class Doughnut {
+  cook(post) {
+    return "Fry until golden brown. " + post;
+  }
+}
+
+class BostonCream < Doughnut {
+  cook(pre) {
+    var a = super.cook(pre);
+    return a + pre + ". Pipe full of custard and coat with chocolate.";
+  }
+}
+
+var b = BostonCream();
+print "super with arguments work okay";
+print b.cook("sugar") == "Fry until golden brown. sugarsugar. Pipe full of custard and coat with chocolate.";
