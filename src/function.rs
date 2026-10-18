@@ -109,7 +109,7 @@ impl LoxCallable for LoxFunction {
                 .environment
                 .borrow()
                 .lookup(&VariableToken::This, Some(0))
-                .expect("this to be defined in an initialier call"))
+                .expect("this to be defined in an initializer call"))
         } else {
             value
         }
