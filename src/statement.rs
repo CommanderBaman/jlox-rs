@@ -3,7 +3,7 @@
 use std::{collections::HashMap, fmt::Display, rc::Rc};
 
 use crate::{
-    error::LanguageError,
+    error::ParseError,
     expression::{Expression, VariableExpression, VariableToken},
     token::Token,
 };
@@ -157,7 +157,7 @@ impl VariableDeclarationStatement {
     pub fn build(
         name: Token,
         expression: Option<Expression>,
-    ) -> Result<Statement, LanguageError> {
+    ) -> Result<Statement, ParseError> {
         Ok(Statement::VariableDeclaration(Rc::new(Self {
             name: name.try_into()?,
             expression,
@@ -276,14 +276,14 @@ impl FunctionDeclarationStatement {
         name: Token,
         parameters: Vec<Token>,
         body: Statement,
-    ) -> Result<Statement, LanguageError> {
+    ) -> Result<Statement, ParseError> {
         let name = name.try_into()?;
         let parameters: Vec<VariableToken> = parameters
             .into_iter()
             .map(<Token as TryInto<VariableToken>>::try_into)
-            .collect::<Result<Vec<VariableToken>, LanguageError>>()?;
+            .collect::<Result<Vec<VariableToken>, ParseError>>()?;
         let Statement::Block(body) = body else {
-            return Err(LanguageError::IncorrectStatementConversion {
+            return Err(ParseError::IncorrectStatementConversion {
                 base_statement: body,
                 converted_to: "BlockStatement",
             });
@@ -352,20 +352,20 @@ impl ClassDeclarationStatement {
         name: Token,
         functions: Vec<Statement>,
         superclass: Option<VariableExpression>,
-    ) -> Result<Statement, LanguageError> {
+    ) -> Result<Statement, ParseError> {
         let name = name.try_into()?;
         let functions = functions
             .into_iter()
             .map(|stmt| match stmt {
                 Statement::Function(f) => Ok((f.name.clone(), f)),
-                _ => Err(LanguageError::IncorrectStatementConversion {
+                _ => Err(ParseError::IncorrectStatementConversion {
                     base_statement: stmt,
                     converted_to: "FunctionDeclarationStatement",
                 }),
             })
             .collect::<Result<
                 HashMap<VariableToken, Rc<FunctionDeclarationStatement>>,
-                LanguageError,
+                ParseError,
             >>()?;
         Ok(Statement::Class(Rc::new(Self {
             name,

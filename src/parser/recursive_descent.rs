@@ -180,10 +180,7 @@ fn variable_declaration_statement(
     }
     _ = tokens.next();
 
-    language_error_wrap(VariableDeclarationStatement::build(
-        variable_token.clone(),
-        expr,
-    ))
+    VariableDeclarationStatement::build(variable_token.clone(), expr)
 }
 
 // functionDeclaration -> "fun" function
@@ -232,11 +229,7 @@ fn function(
         ));
     }
     let body = block_statement(tokens)?;
-    language_error_wrap(FunctionDeclarationStatement::build(
-        name.to_owned(),
-        parameters,
-        body,
-    ))
+    FunctionDeclarationStatement::build(name.to_owned(), parameters, body)
 }
 
 // parameters -> (IDENTIFIER ( "," IDENTIFIER )*)?
@@ -403,8 +396,7 @@ fn for_statement(
     }
     // WARN: this means if we do not use the break keyword, this loop will
     // go till infinity? That is a problem, a BIG problem
-    let condition = condition
-        .unwrap_or(language_error_wrap(LiteralExpression::build(Token::True))?);
+    let condition = condition.unwrap_or(LiteralExpression::build(Token::True)?);
     body = WhileStatement::build(condition, body);
 
     if let Some(initializer) = initializer {
@@ -450,9 +442,7 @@ fn class_declaration_statement(
     if tokens.next_if(|t| matches!(t, Token::Less)).is_some() {
         match tokens.next_if(|t| matches!(t, Token::Identifier(_))) {
             Some(t) => {
-                superclass = Some(language_error_wrap(
-                    VariableExpression::new(t.clone()),
-                )?);
+                superclass = Some(VariableExpression::new(t.clone())?);
             }
             _ => {
                 return Err(ParseError::MalformedDeclaration(
@@ -480,11 +470,7 @@ fn class_declaration_statement(
         ));
     }
 
-    language_error_wrap(ClassDeclarationStatement::build(
-        name.to_owned(),
-        functions,
-        superclass,
-    ))
+    ClassDeclarationStatement::build(name.to_owned(), functions, superclass)
 }
 // grammar
 // expression -> assignment
@@ -589,11 +575,11 @@ fn logic_or(
                 let left_expression = expr;
                 let token = token.unwrap();
                 let right_expression = logic_and(tokens)?;
-                expr = language_error_wrap(LogicalExpression::build(
+                expr = LogicalExpression::build(
                     left_expression,
                     token.to_owned(),
                     right_expression,
-                ))?;
+                )?;
             }
             _ => {
                 break;
@@ -616,11 +602,11 @@ fn logic_and(
                 let left_expression = expr;
                 let token = token.unwrap();
                 let right_expression = equality(tokens)?;
-                expr = language_error_wrap(LogicalExpression::build(
+                expr = LogicalExpression::build(
                     left_expression,
                     token.to_owned(),
                     right_expression,
-                ))?;
+                )?;
             }
             _ => {
                 break;
@@ -643,11 +629,11 @@ fn equality(
                     .next()
                     .expect("no token after peek check - equality");
                 let right_expression = comparison(tokens)?;
-                expression = language_error_wrap(BinaryExpression::build(
+                expression = BinaryExpression::build(
                     left_expression,
                     operator.to_owned(),
                     right_expression,
-                ))?;
+                )?;
             }
             _ => break,
         }
@@ -671,11 +657,11 @@ fn comparison(
                     .next()
                     .expect("no token after peek check - comparison");
                 let right_expression = term(tokens)?;
-                expression = language_error_wrap(BinaryExpression::build(
+                expression = BinaryExpression::build(
                     left_expression,
                     operator.to_owned(),
                     right_expression,
-                ))?;
+                )?;
             }
             _ => break,
         }
@@ -693,11 +679,11 @@ fn term(tokens: &mut Peekable<Iter<Token>>) -> Result<Expression, ParseError> {
                 let operator =
                     tokens.next().expect("no token after peek check - term");
                 let right_expression = factor(tokens)?;
-                expression = language_error_wrap(BinaryExpression::build(
+                expression = BinaryExpression::build(
                     left_expression,
                     operator.to_owned(),
                     right_expression,
-                ))?;
+                )?;
             }
             _ => break,
         }
@@ -717,11 +703,11 @@ fn factor(
                 let operator =
                     tokens.next().expect("no token after peek check - factor");
                 let right_expression = unary(tokens)?;
-                expression = language_error_wrap(BinaryExpression::build(
+                expression = BinaryExpression::build(
                     left_expression,
                     operator.to_owned(),
                     right_expression,
-                ))?;
+                )?;
             }
             _ => break,
         }
@@ -735,10 +721,7 @@ fn unary(tokens: &mut Peekable<Iter<Token>>) -> Result<Expression, ParseError> {
         Some(Token::Bang) | Some(Token::Minus) => {
             let token =
                 tokens.next().expect("no token after peek check - unary");
-            language_error_wrap(UnaryExpression::build(
-                token.to_owned(),
-                unary(tokens)?,
-            ))
+            UnaryExpression::build(token.to_owned(), unary(tokens)?)
         }
         _ => call(tokens),
     }
@@ -786,10 +769,7 @@ fn call(tokens: &mut Peekable<Iter<Token>>) -> Result<Expression, ParseError> {
                     return Err(ParseError::MalformedGet(call_string));
                 }
                 let property = tokens.next().unwrap();
-                expr = language_error_wrap(GetExpression::build(
-                    expr,
-                    property.clone(),
-                ))?;
+                expr = GetExpression::build(expr, property.clone())?;
             }
             _ => {
                 break;
@@ -830,12 +810,8 @@ fn primary(
         | Token::True
         | Token::Nil
         | Token::Number(_)
-        | Token::String(_) => {
-            language_error_wrap(LiteralExpression::build(token.to_owned()))
-        }
-        Token::This => {
-            language_error_wrap(ThisExpression::build(token.to_owned()))
-        }
+        | Token::String(_) => LiteralExpression::build(token.to_owned()),
+        Token::This => ThisExpression::build(token.to_owned()),
         Token::LeftParen => {
             let expression = expression(tokens)?;
             // should end with right parenthesis
@@ -844,9 +820,7 @@ fn primary(
             }
             Ok(GroupingExpression::build(expression))
         }
-        Token::Identifier(_) => {
-            language_error_wrap(VariableExpression::build(token.to_owned()))
-        }
+        Token::Identifier(_) => VariableExpression::build(token.to_owned()),
         Token::Super => {
             if tokens.next_if(|t| matches!(t, Token::Dot)).is_none() {
                 return Err(ParseError::MalformedDeclaration(
@@ -860,37 +834,10 @@ fn primary(
                     "no method after super keyword".to_string(),
                 ));
             };
-            language_error_wrap(SuperExpression::build(
-                token.to_owned(),
-                method.to_owned(),
-            ))
+            SuperExpression::build(token.to_owned(), method.to_owned())
         }
         // FIX: cases found till now
         // 1 + ;
         _ => Err(ParseError::Unknown(token.to_owned())),
     }
-}
-
-fn language_error_wrap<T>(
-    expression: Result<T, LanguageError>,
-) -> Result<T, ParseError> {
-    expression.map_err(|e| match e {
-        LanguageError::IncorrectTokenConversion {
-            base_token,
-            converted_to,
-        } => ParseError::WrongTokenForExpression {
-            expression_type: converted_to,
-            token: base_token,
-        },
-        LanguageError::IncorrectStatementConversion {
-            base_statement,
-            converted_to,
-        } => ParseError::WrongStatementForConversion {
-            statement_type: converted_to,
-            statement: base_statement,
-        },
-        _ => {
-            unreachable!("found not handled error during expression wrap: {e}")
-        }
-    })
 }

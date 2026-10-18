@@ -31,7 +31,7 @@ tasks:
   run:debug:
     desc: run the interpreter in development
     cmds:
-      - cargo run --quiet
+      - cargo run --quiet {{.FLAGS}}
   run:release:
     desc: run the release interpreter
     deps:
@@ -55,6 +55,8 @@ tasks:
       - interpreter
     cmds:
       - task: run:debug
+        vars:
+          FLAGS: "{{.CLI_ARGS}}"
   test:lox:
     desc: run the test file
     deps:

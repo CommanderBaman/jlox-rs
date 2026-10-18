@@ -1,4 +1,4 @@
-use crate::error::LanguageError;
+use crate::error::TokenError;
 
 use strum::Display;
 
@@ -83,7 +83,7 @@ fn keyword_to_token(keyword: &str) -> Option<Token> {
 // currently i just recognize it as a token and I do not
 // know what complications arise from it
 // normally it should be \n, maybe i should add an assert
-pub fn scan_tokens(line: &str) -> Result<Vec<Token>, LanguageError> {
+pub fn scan_tokens(line: &str) -> Result<Vec<Token>, TokenError> {
     let mut tokens: Vec<Token> = Vec::new();
     let mut chars = line.chars().peekable();
     loop {
@@ -169,9 +169,9 @@ pub fn scan_tokens(line: &str) -> Result<Vec<Token>, LanguageError> {
             '"' => {
                 let mut buffer = String::new();
                 loop {
-                    let c = chars.next().ok_or(
-                        LanguageError::UnfinishedString(buffer.clone()),
-                    )?;
+                    let c = chars
+                        .next()
+                        .ok_or(TokenError::UnfinishedString(buffer.clone()))?;
                     if c == '"' {
                         break;
                     }
@@ -194,9 +194,11 @@ pub fn scan_tokens(line: &str) -> Result<Vec<Token>, LanguageError> {
                             break;
                         }
                     }
-                    tokens.push(Token::Number(buffer.parse().map_err(
-                        |_| LanguageError::UnparsableNumber(buffer),
-                    )?));
+                    tokens.push(Token::Number(
+                        buffer.parse().map_err(|_| {
+                            TokenError::UnparsableNumber(buffer)
+                        })?,
+                    ));
                     continue;
                 }
                 if c.is_alphabetic() {
@@ -218,7 +220,7 @@ pub fn scan_tokens(line: &str) -> Result<Vec<Token>, LanguageError> {
                     }
                     continue;
                 }
-                return Err(LanguageError::UnrecognizedToken(c));
+                return Err(TokenError::UnrecognizedToken(c));
             }
         }
     }

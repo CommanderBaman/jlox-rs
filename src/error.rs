@@ -114,18 +114,6 @@ pub enum ParseError {
     MalformedDeclaration(String),
     #[error("get expression does not contain identifier: {0}")]
     MalformedGet(String),
-}
-
-#[derive(Error, Debug)]
-pub enum LanguageError {
-    #[error("could not recognize token: {0}")]
-    UnrecognizedToken(char),
-    #[error("token was incomplete. buffer: {0}")]
-    IncompleteToken(String),
-    #[error("could not parse token as number: {0}")]
-    UnparsableNumber(String),
-    #[error("the given string was not terminated: \"{0}\"")]
-    UnfinishedString(String),
     #[error(
         "the given token {base_token} was incorrectly converted to {converted_to}"
     )]
@@ -140,39 +128,81 @@ pub enum LanguageError {
         base_statement: Statement,
         converted_to: &'static str,
     },
-    #[error("parse errors:\n{}", .0.iter().fold(String::new(), |acc, e| format!("{acc}\n* {e}")).split_off(1))]
-    Parse(Vec<ParseError>),
-    #[error("runtime error: {0}")]
-    Runtime(#[from] RuntimeError),
-    #[error("semantic analysis error: {0}")]
-    Resolver(#[from] ResolverError),
 }
 
 #[derive(Error, Debug)]
-pub enum CliError {
-    #[error("language error at line {line}: {error}")]
-    Language { line: u64, error: LanguageError },
-    #[error("parse error: {0}")]
-    Parse(&'static str),
+pub enum TokenError {
+    #[error("could not recognize token: {0}")]
+    UnrecognizedToken(char),
+    #[error("token was incomplete. buffer: {0}")]
+    IncompleteToken(String),
+    #[error("could not parse token as number: {0}")]
+    UnparsableNumber(String),
+    #[error("the given string was not terminated: \"{0}\"")]
+    UnfinishedString(String),
+}
+
+#[derive(Error, Debug)]
+pub enum LanguageError {
+    #[error("parse errors:\n{}", .0.iter().fold(String::new(), |acc, e| format!("{acc}\n* {e}")).split_off(1))]
+    Parse(Vec<ParseError>),
+    #[error(transparent)]
+    Runtime(#[from] RuntimeError),
+    #[error(transparent)]
+    Resolver(#[from] ResolverError),
+    #[error(transparent)]
+    Token(#[from] TokenError),
+}
+
+impl From<LanguageError> for ExitCode {
+    fn from(value: LanguageError) -> Self {
+        let error_code = match value {
+            LanguageError::Token(_)
+            | LanguageError::Parse(_)
+            | LanguageError::Resolver(_) => 65,
+            LanguageError::Runtime(_) => 70,
+        };
+        ExitCode::from(error_code)
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum IoError {
+    #[error(transparent)]
+    BaseIo(#[from] std::io::Error),
+    #[error("too many arguments provided. need at most one. received {0}")]
+    TooManyArguments(usize),
     #[error("path does not exist: {0}")]
     PathDoesNotExist(String),
     #[error("given path is not a file: {0}")]
     NotFile(String),
-    #[error("io error: {0}")]
-    Io(#[from] std::io::Error),
-    #[error("runtime error at line {line}: {error}")]
-    Runtime { line: u64, error: RuntimeError },
+}
+
+impl From<IoError> for ExitCode {
+    fn from(value: IoError) -> Self {
+        let error_code = match value {
+            IoError::BaseIo(_)
+            | IoError::NotFile(_)
+            | IoError::PathDoesNotExist(_) => 66,
+            IoError::TooManyArguments(_) => 64,
+        };
+        ExitCode::from(error_code)
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum CliError {
+    #[error(transparent)]
+    Language(#[from] LanguageError),
+    #[error(transparent)]
+    Io(#[from] IoError),
 }
 
 impl From<CliError> for ExitCode {
     fn from(value: CliError) -> Self {
         match value {
-            CliError::Language { .. } => ExitCode::from(65),
-            CliError::Parse(..) => ExitCode::from(64),
-            CliError::PathDoesNotExist(..) => ExitCode::from(66),
-            CliError::NotFile(..) => ExitCode::from(66),
-            CliError::Io(..) => ExitCode::from(66),
-            CliError::Runtime { .. } => ExitCode::from(70),
+            CliError::Language(l) => l.into(),
+            CliError::Io(i) => i.into(),
         }
     }
 }

@@ -1,6 +1,6 @@
 use std::{fmt::Display, rc::Rc};
 
-use crate::{error::LanguageError, token::Token};
+use crate::{error::ParseError, token::Token};
 use strum::Display;
 
 pub mod print;
@@ -99,7 +99,7 @@ pub enum LiteralToken {
     Nil,
 }
 impl TryFrom<Token> for LiteralToken {
-    type Error = LanguageError;
+    type Error = ParseError;
     fn try_from(token: Token) -> Result<Self, Self::Error> {
         match token {
             Token::Number(n) => Ok(LiteralToken::Number(n)),
@@ -107,7 +107,7 @@ impl TryFrom<Token> for LiteralToken {
             Token::True => Ok(LiteralToken::True),
             Token::False => Ok(LiteralToken::False),
             Token::Nil => Ok(LiteralToken::Nil),
-            _ => Err(LanguageError::IncorrectTokenConversion {
+            _ => Err(ParseError::IncorrectTokenConversion {
                 base_token: token,
                 converted_to: "LiteralToken",
             }),
@@ -122,7 +122,7 @@ impl LiteralExpression {
     pub fn wrap(self) -> Expression {
         Expression::Literal(self)
     }
-    pub fn build(token: Token) -> Result<Expression, LanguageError> {
+    pub fn build(token: Token) -> Result<Expression, ParseError> {
         let literal = token.try_into()?;
         Ok(Expression::Literal(Self { literal }))
     }
@@ -165,12 +165,12 @@ pub enum UnaryOperator {
     Minus,
 }
 impl TryFrom<Token> for UnaryOperator {
-    type Error = LanguageError;
+    type Error = ParseError;
     fn try_from(token: Token) -> Result<Self, Self::Error> {
         match token {
             Token::Minus => Ok(UnaryOperator::Minus),
             Token::Bang => Ok(UnaryOperator::Bang),
-            _ => Err(LanguageError::IncorrectTokenConversion {
+            _ => Err(ParseError::IncorrectTokenConversion {
                 base_token: token,
                 converted_to: "UnaryOperator",
             }),
@@ -189,7 +189,7 @@ impl UnaryExpression {
     pub fn build(
         token: Token,
         expression: Expression,
-    ) -> Result<Expression, LanguageError> {
+    ) -> Result<Expression, ParseError> {
         let operator = token.try_into()?;
         Ok(Expression::Unary(Self {
             operator,
@@ -229,7 +229,7 @@ pub enum BinaryOperator {
     Slash,
 }
 impl TryFrom<Token> for BinaryOperator {
-    type Error = LanguageError;
+    type Error = ParseError;
     fn try_from(token: Token) -> Result<Self, Self::Error> {
         match token {
             Token::EqualEqual => Ok(BinaryOperator::EqualEqual),
@@ -242,7 +242,7 @@ impl TryFrom<Token> for BinaryOperator {
             Token::Minus => Ok(BinaryOperator::Minus),
             Token::Star => Ok(BinaryOperator::Star),
             Token::Slash => Ok(BinaryOperator::Slash),
-            _ => Err(LanguageError::IncorrectTokenConversion {
+            _ => Err(ParseError::IncorrectTokenConversion {
                 base_token: token,
                 converted_to: "BinaryOperator",
             }),
@@ -263,7 +263,7 @@ impl BinaryExpression {
         left_expression: Expression,
         token: Token,
         right_expression: Expression,
-    ) -> Result<Expression, LanguageError> {
+    ) -> Result<Expression, ParseError> {
         let operator = token.try_into()?;
         Ok(Expression::Binary(Self {
             left_expression: Rc::new(left_expression),
@@ -292,12 +292,12 @@ pub enum LogicalOperator {
     Or,
 }
 impl TryFrom<Token> for LogicalOperator {
-    type Error = LanguageError;
+    type Error = ParseError;
     fn try_from(token: Token) -> Result<Self, Self::Error> {
         match token {
             Token::And => Ok(LogicalOperator::And),
             Token::Or => Ok(LogicalOperator::Or),
-            _ => Err(LanguageError::IncorrectTokenConversion {
+            _ => Err(ParseError::IncorrectTokenConversion {
                 base_token: token,
                 converted_to: "LogicalOperator",
             }),
@@ -318,7 +318,7 @@ impl LogicalExpression {
         left_expression: Expression,
         token: Token,
         right_expression: Expression,
-    ) -> Result<Expression, LanguageError> {
+    ) -> Result<Expression, ParseError> {
         let operator = token.try_into()?;
         Ok(Expression::Logical(Self {
             left_expression: Rc::new(left_expression),
@@ -347,13 +347,13 @@ pub enum VariableToken {
     Super,
 }
 impl TryFrom<Token> for VariableToken {
-    type Error = LanguageError;
+    type Error = ParseError;
     fn try_from(token: Token) -> Result<Self, Self::Error> {
         match token {
             Token::Identifier(i) => Ok(VariableToken::Identifier(i)),
             Token::This => Ok(VariableToken::This),
             Token::Super => Ok(VariableToken::Super),
-            _ => Err(LanguageError::IncorrectTokenConversion {
+            _ => Err(ParseError::IncorrectTokenConversion {
                 base_token: token,
                 converted_to: "VariableToken",
             }),
@@ -368,11 +368,11 @@ impl VariableExpression {
     pub fn wrap(self) -> Expression {
         Expression::Variable(self)
     }
-    pub fn build(token: Token) -> Result<Expression, LanguageError> {
+    pub fn build(token: Token) -> Result<Expression, ParseError> {
         let variable = token.try_into()?;
         Ok(Expression::Variable(Self { variable }))
     }
-    pub fn new(token: Token) -> Result<Self, LanguageError> {
+    pub fn new(token: Token) -> Result<Self, ParseError> {
         let variable = token.try_into()?;
         Ok(Self { variable })
     }
@@ -445,7 +445,7 @@ impl GetExpression {
     pub fn build(
         callee: Expression,
         property: Token,
-    ) -> Result<Expression, LanguageError> {
+    ) -> Result<Expression, ParseError> {
         let property = property.try_into()?;
         Ok(Expression::Get(Self {
             callee: Rc::new(callee),
@@ -498,10 +498,10 @@ impl ThisExpression {
     pub fn wrap(self) -> Expression {
         Expression::This(self)
     }
-    pub fn build(token: Token) -> Result<Expression, LanguageError> {
+    pub fn build(token: Token) -> Result<Expression, ParseError> {
         let this_token = token.clone().try_into()?;
         if !matches!(this_token, VariableToken::This) {
-            return Err(LanguageError::IncorrectTokenConversion {
+            return Err(ParseError::IncorrectTokenConversion {
                 base_token: token,
                 converted_to: "ThisToken",
             });
@@ -529,17 +529,17 @@ impl SuperExpression {
     pub fn build(
         token: Token,
         method: Token,
-    ) -> Result<Expression, LanguageError> {
+    ) -> Result<Expression, ParseError> {
         let this_token = token.clone().try_into()?;
         if !matches!(this_token, VariableToken::Super) {
-            return Err(LanguageError::IncorrectTokenConversion {
+            return Err(ParseError::IncorrectTokenConversion {
                 base_token: token,
                 converted_to: "SuperToken",
             });
         }
         let method_token = method.clone().try_into()?;
         if !matches!(method_token, VariableToken::Identifier(_)) {
-            return Err(LanguageError::IncorrectTokenConversion {
+            return Err(ParseError::IncorrectTokenConversion {
                 base_token: method,
                 converted_to: "MethodToken",
             });

@@ -1,5 +1,5 @@
 use crate::{
-    error::{CliError, LanguageError, ParseError},
+    error::{CliError, IoError, LanguageError, ParseError},
     lox::Lox,
 };
 use std::{
@@ -13,9 +13,7 @@ pub fn run() -> Result<(), CliError> {
     let mut args = env::args();
     let n_args = args.len();
     if n_args > 2 {
-        return Err(CliError::Parse(
-            "too many arguments provided. need at most one.",
-        ));
+        return Err(IoError::TooManyArguments(n_args - 1).into());
     }
     let cmd_name = args.next();
     assert!(cmd_name.is_some());
@@ -28,42 +26,36 @@ pub fn run() -> Result<(), CliError> {
     }
 }
 
+fn open_file(path: &Path) -> Result<File, IoError> {
+    File::open(path).map_err(IoError::BaseIo)
+}
+
 fn run_file(path: &Path) -> Result<(), CliError> {
     if !path.exists() {
-        return Err(CliError::PathDoesNotExist(
+        return Err(IoError::PathDoesNotExist(
             path.to_string_lossy().to_string(),
-        ));
+        )
+        .into());
     }
     if !path.is_file() {
-        return Err(CliError::NotFile(path.to_string_lossy().to_string()));
+        return Err(IoError::NotFile(path.to_string_lossy().to_string()).into());
     }
     println!("running file at {path:?}");
-    let file = File::open(path)?;
+    let file = open_file(path)?;
     let mut reader = BufReader::new(file);
 
-    let mut program = Lox::new(false)
-        .map_err(|e| CliError::Language { line: 0, error: e })?;
+    let mut program = Lox::new(false)?;
     let line_count = 1;
 
     let mut lines = String::new();
-    reader.read_to_string(&mut lines)?;
+    reader.read_to_string(&mut lines).map_err(IoError::BaseIo)?;
 
-    program.run(&lines, &line_count).map_err(|e| match e {
-        LanguageError::Runtime(r) => CliError::Runtime {
-            line: line_count,
-            error: r,
-        },
-        _ => CliError::Language {
-            line: line_count,
-            error: e,
-        },
-    })?;
+    program.run(&lines, &line_count)?;
     Ok(())
 }
 
 fn run_prompt() -> Result<(), CliError> {
-    let mut program =
-        Lox::new(true).map_err(|e| CliError::Language { line: 0, error: e })?;
+    let mut program = Lox::new(true)?;
     let mut input = String::new();
     println!("starting lox interpreter");
     let mut line_count = 1;
@@ -74,8 +66,8 @@ fn run_prompt() -> Result<(), CliError> {
             print!("> ");
             saved = String::new();
         }
-        io::stdout().flush()?;
-        io::stdin().read_line(&mut input)?;
+        io::stdout().flush().map_err(IoError::BaseIo)?;
+        io::stdin().read_line(&mut input).map_err(IoError::BaseIo)?;
         let cleaned_input = input.trim();
         if cleaned_input.is_empty() {
             if in_block {
