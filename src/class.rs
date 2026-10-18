@@ -1,17 +1,18 @@
 use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc};
 
 use crate::{
+    environment::Environment,
     error::RuntimeError,
     expression::VariableToken,
     function::{LoxCallable, LoxFunction},
     interpreter::{Interpreter, InterpreterEnvironment, Value},
-    statement::ClassDeclarationStatement,
+    statement::{ClassDeclarationStatement, FunctionDeclarationStatement},
 };
 
 #[derive(Debug)]
 pub struct LoxClass {
-    name: VariableToken,
-    methods: HashMap<VariableToken, Rc<LoxFunction>>,
+    declaration: Rc<ClassDeclarationStatement>,
+    environment: InterpreterEnvironment,
     superclass: Option<Rc<LoxClass>>,
 }
 impl LoxClass {
@@ -20,27 +21,27 @@ impl LoxClass {
         environment: InterpreterEnvironment,
         superclass: Option<Rc<LoxClass>>,
     ) -> Self {
-        let mut methods = HashMap::new();
-        for method in &declaration.functions {
-            methods.insert(
-                method.name.clone(),
-                LoxFunction::new(
-                    method.clone(),
-                    environment.clone(),
-                    method
-                        .name
-                        .eq(&VariableToken::Identifier("init".to_string())),
-                ),
+        // if superclass is defined, we need
+        // the super defined in the current environment
+        if superclass.is_some() {
+            assert!(
+                environment
+                    .borrow()
+                    .lookup(&VariableToken::Super, Some(0))
+                    .is_some()
             );
         }
         Self {
-            name: declaration.name.clone(),
-            methods,
+            declaration,
+            environment,
             superclass,
         }
     }
-    pub fn get_method(&self, name: &VariableToken) -> Option<Rc<LoxFunction>> {
-        self.methods.get(name).cloned().or_else(|| {
+    pub fn get_method(
+        &self,
+        name: &VariableToken,
+    ) -> Option<Rc<FunctionDeclarationStatement>> {
+        self.declaration.functions.get(name).cloned().or_else(|| {
             self.superclass.as_ref().and_then(|c| c.get_method(name))
         })
     }
@@ -48,13 +49,14 @@ impl LoxClass {
 
 impl Display for LoxClass {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} class", self.name)
+        write!(f, "{} class", self.declaration.name)
     }
 }
 
 impl LoxCallable for LoxClass {
     fn arity(&self) -> usize {
-        self.methods
+        self.declaration
+            .functions
             .get(&VariableToken::Identifier("init".to_string()))
             .map(|f| f.arity())
             .unwrap_or(0)
@@ -67,17 +69,17 @@ impl LoxCallable for LoxClass {
         // extra 1 because of reference to self at last
         if self.arity() + 1 != arguments.len() {
             return Err(RuntimeError::IncorrectNumberOfArguments {
-                callee_name: self.name.to_string(),
+                callee_name: self.declaration.name.to_string(),
                 expected_arguments: self.arity(),
                 received_arguments: arguments.len(),
             });
         }
-        let Some(Value::ClassDeclaration(self_reference)) = arguments.last()
-        else {
+        let Some(Value::ClassDeclaration(class)) = arguments.last() else {
             unreachable!("last element of class call should be self reference");
         };
         Ok(Value::ClassInstance(Rc::new(LoxInstance::new(
-            self_reference.clone(),
+            class.clone(),
+            Rc::new(RefCell::new(Environment::child(self.environment.clone()))),
         ))))
     }
 }
@@ -85,32 +87,33 @@ impl LoxCallable for LoxClass {
 #[derive(Debug)]
 pub struct LoxInstance {
     fields: RefCell<HashMap<VariableToken, Value>>,
+    environment: InterpreterEnvironment,
     class: Rc<LoxClass>,
 }
 
 impl LoxInstance {
-    pub fn new(class: Rc<LoxClass>) -> Self {
+    pub fn new(
+        class: Rc<LoxClass>,
+        environment: InterpreterEnvironment,
+    ) -> Self {
         Self {
             fields: RefCell::new(HashMap::new()),
             class,
+            environment,
         }
     }
-    pub fn get(
-        &self,
-        property: &VariableToken,
-        this_value: Value,
-        environment: InterpreterEnvironment,
-    ) -> Result<Value, RuntimeError> {
+    pub fn get(&self, property: &VariableToken) -> Result<Value, RuntimeError> {
         self.fields
             .borrow()
             .get(property)
             .cloned()
             .or_else(|| {
                 self.class.get_method(property).map(|f| {
-                    environment
-                        .borrow_mut()
-                        .define(VariableToken::This, this_value);
-                    Value::Call(f.using(environment))
+                    Value::Call(LoxFunction::new(
+                        f.clone(),
+                        self.environment.clone(),
+                        f.name == VariableToken::Identifier("init".to_string()),
+                    ))
                 })
             })
             .ok_or(RuntimeError::PropertyNotFound(
@@ -123,22 +126,41 @@ impl LoxInstance {
     }
     pub fn init(
         &self,
-        this_value: Value,
         interpreter: &mut Interpreter,
         arguments: Vec<Value>,
     ) -> Result<(), RuntimeError> {
-        match self.get(
-            &VariableToken::Identifier("init".to_string()),
-            this_value,
-            interpreter.environment.clone(),
-        ) {
-            Ok(call) => {
-                call.call(interpreter, arguments)?;
-                Ok(())
-            }
-            Err(RuntimeError::PropertyNotFound(_, _)) => Ok(()),
-            Err(e) => Err(e),
-        }
+        // 'this' is defined
+        assert!(
+            self.environment
+                .borrow()
+                .lookup(&VariableToken::This, Some(0))
+                .is_some()
+        );
+        let value =
+            match self.get(&VariableToken::Identifier("init".to_string())) {
+                Ok(call) => {
+                    call.call(interpreter, arguments)?;
+                    Ok(())
+                }
+                Err(RuntimeError::PropertyNotFound(_, _)) => Ok(()),
+                Err(e) => Err(e),
+            };
+        value
+    }
+    pub fn environment(&self) -> InterpreterEnvironment {
+        // 'this' is defined
+        assert!(
+            self.environment
+                .borrow()
+                .lookup(&VariableToken::This, Some(0))
+                .is_some()
+        );
+        self.environment.clone()
+    }
+    pub fn bind(&self, this: Value) {
+        self.environment
+            .borrow_mut()
+            .define(VariableToken::This, this);
     }
 }
 
@@ -154,7 +176,7 @@ impl Display for LoxInstance {
         write!(
             f,
             "{} instance with fields {{ {}}}",
-            self.class.name, fields_string
+            self.class.declaration.name, fields_string
         )
     }
 }

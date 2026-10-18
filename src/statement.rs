@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use std::{fmt::Display, rc::Rc};
+use std::{collections::HashMap, fmt::Display, rc::Rc};
 
 use crate::{
     error::LanguageError,
@@ -337,8 +337,11 @@ impl Display for ReturnStatement {
 // classDeclaration ->  "class" IDENTIFIER "{" function* "}"
 #[derive(Debug, Clone)]
 pub struct ClassDeclarationStatement {
+    // NOTE: I could have used a vector for the functions, but it is better to
+    // store them in a hashmap so that we can use this statement directly in
+    // the lox class definition like the lox function
     pub name: VariableToken,
-    pub functions: Vec<Rc<FunctionDeclarationStatement>>,
+    pub functions: HashMap<VariableToken, Rc<FunctionDeclarationStatement>>,
     // I am confused as to keep variable expression or expression
     // keeping variable expression as it feels correct
     pub superclass: Option<VariableExpression>,
@@ -354,13 +357,16 @@ impl ClassDeclarationStatement {
         let functions = functions
             .into_iter()
             .map(|stmt| match stmt {
-                Statement::Function(f) => Ok(f),
+                Statement::Function(f) => Ok((f.name.clone(), f)),
                 _ => Err(LanguageError::IncorrectStatementConversion {
                     base_statement: stmt,
                     converted_to: "FunctionDeclarationStatement",
                 }),
             })
-            .collect::<Result<Vec<Rc<FunctionDeclarationStatement>>, LanguageError>>()?;
+            .collect::<Result<
+                HashMap<VariableToken, Rc<FunctionDeclarationStatement>>,
+                LanguageError,
+            >>()?;
         Ok(Statement::Class(Rc::new(Self {
             name,
             functions,
@@ -376,7 +382,7 @@ impl Display for ClassDeclarationStatement {
             "class {} {{{}}}",
             self.name,
             self.functions
-                .iter()
+                .values()
                 .map(|f| format!("{f}"))
                 .collect::<Vec<String>>()
                 .join(", ")

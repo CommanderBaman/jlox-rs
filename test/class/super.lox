@@ -1,3 +1,4 @@
+print "";
 class Doughnut {
   cook() {
     print "Fry until golden brown.";
@@ -11,4 +12,5 @@ class BostonCream < Doughnut {
   }
 }
 
-BostonCream().cook();
+var b = BostonCream();
+b.cook();

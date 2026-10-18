@@ -20,6 +20,56 @@ pub trait LoxCallable: Display + Debug {
     ) -> Result<Value, RuntimeError>;
 }
 
+// NOTE: In my version, I have made the classes, functions and instances
+// own their environment because I won't be able to make closures otherwise.
+// I have written asserts in order to ensure that I am correct
+
+// NOTE: this should not have a LoxCallable implementation, because it makes
+// it possible pass in the declaration statement inside the Value object. It
+// is easy to make this mistake.
+// While writing StatementVisitor, I made a call object using function
+// declaration rather than the LoxFunction struct.
+// Hardening the code to avoid this mistake will make things more
+// complicated than they are now.
+// Still, I have done this because it makes it easier for me to reason with
+// my code. Any function declaration can be called, and lox function just
+// provides the ability to overwrite the environment before running the
+// function -> making it a closure
+// Also, this provides excellent code reuse. Just take a look at the
+// arity function implementations. All point here because function declaration
+// is at the root of everything. It is breathtaking, marvelous.
+impl LoxCallable for FunctionDeclarationStatement {
+    fn arity(&self) -> usize {
+        self.parameters.len()
+    }
+    fn call(
+        &self,
+        interpreter: &mut Interpreter,
+        arguments: Vec<Value>,
+    ) -> Result<Value, RuntimeError> {
+        if self.arity() != arguments.len() {
+            return Err(RuntimeError::IncorrectNumberOfArguments {
+                callee_name: self.name.to_string(),
+                expected_arguments: self.arity(),
+                received_arguments: arguments.len(),
+            });
+        }
+        interpreter.push_environment();
+        for (name, arg) in self.parameters.iter().zip(arguments.iter()) {
+            interpreter
+                .environment
+                .borrow_mut()
+                .define(name.to_owned(), arg.to_owned());
+        }
+        let value = interpreter.visit_block(self.body.clone());
+        interpreter.pop_environment()?;
+        match value {
+            Err(RuntimeError::Return(v)) => Ok(v),
+            v => v,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct LoxFunction {
     declaration: Rc<FunctionDeclarationStatement>,
@@ -39,56 +89,29 @@ impl LoxFunction {
             is_initializer,
         })
     }
-    pub fn using(&self, environment: InterpreterEnvironment) -> Rc<Self> {
-        Rc::new(Self {
-            declaration: self.declaration.clone(),
-            is_initializer: self.is_initializer,
-            environment,
-        })
-    }
 }
 
 impl LoxCallable for LoxFunction {
     fn arity(&self) -> usize {
-        self.declaration.parameters.len()
+        self.declaration.arity()
     }
     fn call(
         &self,
         interpreter: &mut Interpreter,
         arguments: Vec<Value>,
     ) -> Result<Value, RuntimeError> {
-        if self.arity() != arguments.len() {
-            return Err(RuntimeError::IncorrectNumberOfArguments {
-                callee_name: self.declaration.name.to_string(),
-                expected_arguments: self.arity(),
-                received_arguments: arguments.len(),
-            });
-        }
         let old_environment =
             interpreter.assign_environment(self.environment.clone());
-        interpreter.push_environment();
-        for (name, arg) in
-            self.declaration.parameters.iter().zip(arguments.iter())
-        {
-            interpreter
-                .environment
-                .borrow_mut()
-                .define(name.to_owned(), arg.to_owned());
-        }
-        let value = interpreter.visit_block(self.declaration.body.clone());
-        interpreter.pop_environment()?;
+        let value = self.declaration.call(interpreter, arguments);
         let _ = interpreter.assign_environment(old_environment);
         if self.is_initializer {
-            Ok(interpreter
+            Ok(self
                 .environment
                 .borrow()
-                .get(&VariableToken::This)
-                .expect("this to be defined in an init call"))
+                .lookup(&VariableToken::This, Some(0))
+                .expect("this to be defined in an initialier call"))
         } else {
-            match value {
-                Err(RuntimeError::Return(v)) => Ok(v),
-                v => v,
-            }
+            value
         }
     }
 }

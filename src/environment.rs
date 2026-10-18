@@ -59,7 +59,7 @@ impl Display for Environment {
         let mut tail = self.parent.clone();
         while let Some(block) = tail {
             let block = block.borrow();
-            string = format!("{} -> {}", string, block.format_stored());
+            string = format!("{}\n -> {}", string, block.format_stored());
             tail = block.parent.clone();
         }
         write!(f, "{string}")

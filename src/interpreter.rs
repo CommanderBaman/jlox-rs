@@ -71,11 +71,19 @@ impl Value {
                 // add reference to self in the end because
                 // we need a reference to main class in instance
                 arguments.push(self.clone());
+                // NOTE: we do not need to push an environment here
+                // because I build the instance on top of the
+                // class environment
+                // but we need it when we call the init
                 let value = c.call(interpreter, arguments.clone())?;
-                match value {
-                    Self::ClassInstance(ref i) => {
+                match &value {
+                    Self::ClassInstance(i) => {
                         arguments.pop();
-                        i.init(value.clone(), interpreter, arguments)?;
+                        i.bind(value.clone());
+                        interpreter.push_environment();
+                        let e = i.init(interpreter, arguments);
+                        interpreter.pop_environment()?;
+                        e?;
                     }
                     _ => unreachable!(
                         "call to class declaration should produce its instance"
@@ -86,6 +94,12 @@ impl Value {
             _ => {
                 return Err(RuntimeError::NotCallable(self.to_string()));
             }
+        }
+    }
+    fn environment(&self) -> InterpreterEnvironment {
+        match self {
+            Self::ClassInstance(c) => c.environment(),
+            e => unreachable!("you must not call environment on {e}"),
         }
     }
 }
@@ -491,11 +505,7 @@ impl ExpressionVisitor<Result<Value, RuntimeError>> for Interpreter {
         let Value::ClassInstance(object) = &callee else {
             return Err(RuntimeError::NoProperties(callee));
         };
-        object.get(
-            &expression.property,
-            callee.clone(),
-            self.environment.clone(),
-        )
+        object.get(&expression.property)
     }
     fn visit_set(
         &mut self,
@@ -555,10 +565,13 @@ impl ExpressionVisitor<Result<Value, RuntimeError>> for Interpreter {
                 superclass, expression.method
             )),
         )?;
-        self.environment
-            .borrow_mut()
-            .define(VariableToken::This, this_object);
-        Ok(Value::Call(method.using(self.environment.clone())))
+        Ok(Value::Call(LoxFunction::new(
+            method.clone(),
+            this_object.environment(),
+            method
+                .name
+                .eq(&VariableToken::Identifier("init".to_string())),
+        )))
     }
 }
 

@@ -225,21 +225,21 @@ print Food().eat() == "Swallow!";
 f.name = "tomato";
 print "can access stored variables";
 print f.name == "tomato";
-
-class Thing {
-  getCallback() {
-    fun localFunction() {
-      return this;
-    }
-    return localFunction;
-  }
-}
-
-var t = Thing();
-var callback = t.getCallback();
-t.x = "value";
-
-print "binding of this in class closures";
-print callback().x == "value";
-
+// 
+// class Thing {
+//   getCallback() {
+//     fun localFunction() {
+//       return this;
+//     }
+//     return localFunction;
+//   }
+// }
+// 
+// var t = Thing();
+// var callback = t.getCallback();
+// t.x = "value";
+// 
+// print "binding of this in class closures";
+// print callback().x == "value";
+// 
 

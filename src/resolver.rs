@@ -198,8 +198,9 @@ impl<'a> Resolver<'a> {
     ) {
         for (num_hops, scope) in self.scopes.iter().rev().enumerate() {
             if scope.contains_key(name) {
-                self.interpreter.resolve(expression.addr(), num_hops);
-                self.resolves.insert(expression.addr(), num_hops);
+                let addr = expression.addr();
+                self.interpreter.resolve(addr, num_hops);
+                self.resolves.insert(addr, num_hops);
                 break;
             }
         }
@@ -427,14 +428,14 @@ impl StatementVisitor<Result<(), ResolverError>> for Resolver<'_> {
         self.begin_scope();
         self.declare(VariableToken::This)?;
         self.define(VariableToken::This)?;
-        for function in statement.functions.clone() {
+        for function in statement.functions.values() {
             let kind = match &function.name {
                 VariableToken::Identifier(name) if name == "init" => {
                     FunctionKind::Initializer
                 }
                 _ => FunctionKind::Method,
             };
-            self.resolve_function(function, kind)?;
+            self.resolve_function(function.clone(), kind)?;
         }
         if statement.superclass.is_some() {
             self.end_scope()?;
