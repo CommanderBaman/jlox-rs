@@ -135,12 +135,29 @@ impl Display for LoxFunction {
     }
 }
 
+trait InbuiltFunction: LoxCallable + Sized + 'static {
+    fn new() -> Self;
+    fn name() -> &'static str;
+    fn token() -> VariableToken {
+        VariableToken::Identifier(Self::name().to_string())
+    }
+    fn display_string() -> String {
+        format!("inbuilt fun {}()", Self::name())
+    }
+    fn for_environment() -> (VariableToken, Value) {
+        (Self::token(), Value::Call(Rc::new(Self::new())))
+    }
+}
+
 #[derive(Debug)]
 pub struct ClockFunction {}
 
-impl ClockFunction {
-    fn as_value() -> Value {
-        Value::Call(Rc::new(Self {}))
+impl InbuiltFunction for ClockFunction {
+    fn new() -> Self {
+        Self {}
+    }
+    fn name() -> &'static str {
+        "clock"
     }
 }
 
@@ -167,16 +184,62 @@ impl LoxCallable for ClockFunction {
 }
 impl Display for ClockFunction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "inbuilt fun clock()")
+        write!(f, "{}", Self::display_string())
+    }
+}
+
+#[derive(Debug)]
+pub struct PreciseClockFunction {}
+
+impl InbuiltFunction for PreciseClockFunction {
+    fn new() -> Self {
+        Self {}
+    }
+    fn name() -> &'static str {
+        "clockNs"
+    }
+}
+
+impl LoxCallable for PreciseClockFunction {
+    fn arity(&self) -> usize {
+        0
+    }
+    fn call(
+        &self,
+        _interpreter: &mut Interpreter,
+        arguments: Vec<Value>,
+    ) -> Result<Value, RuntimeError> {
+        if self.arity() != arguments.len() {
+            return Err(RuntimeError::IncorrectNumberOfArguments {
+                callee_name: "clockNs".to_string(),
+                expected_arguments: self.arity(),
+                received_arguments: arguments.len(),
+            });
+        }
+        Ok(time::SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|n| Value::Number(n.as_nanos() as f64))?)
+    }
+}
+
+impl Display for PreciseClockFunction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", Self::display_string())
     }
 }
 
 pub fn add_native_functions(
     interpreter: &mut Interpreter,
 ) -> Result<(), RuntimeError> {
-    interpreter.environment.borrow_mut().define(
-        VariableToken::Identifier("clock".to_owned()),
-        ClockFunction::as_value(),
-    );
+    let clock_function = ClockFunction::for_environment();
+    interpreter
+        .environment
+        .borrow_mut()
+        .define(clock_function.0, clock_function.1);
+    let clock_precise_function = PreciseClockFunction::for_environment();
+    interpreter
+        .environment
+        .borrow_mut()
+        .define(clock_precise_function.0, clock_precise_function.1);
     Ok(())
 }

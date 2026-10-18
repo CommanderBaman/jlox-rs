@@ -1,4 +1,4 @@
-var start = clock();
+var start = clockNs();
 
 print "------------------";
 print " Expression Tests ";
@@ -10,7 +10,7 @@ print 1 + 2 == 3;
 print "precedence: 1 + 2 * 3 + 4 / 2 == 9";
 print 1 + 2 * 3 + 4 / 2 == 9;
 
-var expressionTestTime = clock();
+var expressionTestTime = clockNs();
 
 print "";
 print "----------------------------";
@@ -20,7 +20,7 @@ var a = 2;
 print "a == 2";
 print a == 2;
 
-var variableDeclarationTime = clock();
+var variableDeclarationTime = clockNs();
 
 print "";
 print "-------------";
@@ -55,7 +55,7 @@ print b == "global b";
 print "c == 'global c'";
 print c == "global c";
 
-var blockTime = clock();
+var blockTime = clockNs();
 
 
 print "";
@@ -69,7 +69,7 @@ if (true) print true;
 print "basic else";
 if (false) print false; else print true;
 
-var ifTime = clock();
+var ifTime = clockNs();
 
 print "";
 print "---------------";
@@ -105,7 +105,7 @@ print (false or true == false) == false;
 print "precedence: (F or T) == T is T";
 print ((false or true) == true) == true;
 
-var logicalTime = clock();
+var logicalTime = clockNs();
 
 print "";
 print "--------------";
@@ -119,7 +119,7 @@ while (a < 3) { a = a + 1;}
 print "a incremented to 3 in while";
 print a == 3;
 
-var whileTime = clock();
+var whileTime = clockNs();
 
 print "";
 print "------------";
@@ -136,7 +136,7 @@ for (var b = 0; b < 4; b = b + 1) {
 print "a incremented to 6 in for";
 print a == 6;
 
-var forTime = clock();
+var forTime = clockNs();
 
 print "";
 print "----------------";
@@ -216,7 +216,7 @@ print "closure 3 - third modifies second";
 print x() == "hello22";
 
 
-var functionTime = clock();
+var functionTime = clockNs();
 
 print "";
 print "-------------";
@@ -277,12 +277,25 @@ print b.cook("sugar") == "Fry until golden brown. sugarsugar. Pipe full of custa
 
 
 // comment below if you do not want timing information
-var classTime = clock();
+var classTime = clockNs();
 var end = classTime;
 
 fun formatTime(end, start) {
-    return (end - start) + "ms";
-
+    var s = start;
+    var e = end;
+    if (end < start) {
+        var temp = s;
+        s = e;
+        e = temp;
+    }
+    var diff = end - start;
+    if (diff > 1000000) {
+        return diff / 1000000 + "ms";
+    }
+    if (diff > 1000) {
+        return diff / 1000 + "us";
+    }
+    return diff + "ns";
 }
 
 
@@ -290,13 +303,15 @@ print "";
 print "--------------------";
 print " Timing information ";
 print "--------------------";
-print " * expression tests: " + formatTime(expressionTestTime, start);
-print " * variable tests: " + formatTime(variableDeclarationTime, expressionTestTime);
-print " * block tests: " + formatTime(blockTime, variableDeclarationTime);
-print " * if tests: " + formatTime(ifTime, blockTime);
-print " * logical tests: " + formatTime(logicalTime, ifTime);
-print " * while tests: " + formatTime(whileTime, logicalTime);
-print " * for tests: " + formatTime(forTime, whileTime);
-print " * function tests: " + formatTime(functionTime, forTime);
-print " * class tests: " + formatTime(classTime, functionTime);
+print "By Parts:";
+print "  * expression tests: " + formatTime(expressionTestTime, start);
+print "  * variable tests:   " + formatTime(variableDeclarationTime, expressionTestTime);
+print "  * block tests:      " + formatTime(blockTime, variableDeclarationTime);
+print "  * if tests:         " + formatTime(ifTime, blockTime);
+print "  * logical tests:    " + formatTime(logicalTime, ifTime);
+print "  * while tests:      " + formatTime(whileTime, logicalTime);
+print "  * for tests:        " + formatTime(forTime, whileTime);
+print "  * function tests:   " + formatTime(functionTime, forTime);
+print "  * class tests:      " + formatTime(classTime, functionTime);
+print "";
 print "Total: " + formatTime(end, start);

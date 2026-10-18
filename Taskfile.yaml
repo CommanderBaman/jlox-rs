@@ -38,6 +38,17 @@ tasks:
       - build:release
     cmds:
       - "{{.RELEASE_BUILD_OUTPUT}}"
+  run:file:release:
+    desc: run the release interpreter on a single file
+    deps:
+      - task: build:release
+        vars:
+          FLAGS: "--quiet"
+    requires:
+      vars:
+        - FILE
+    cmds:
+      - "{{.RELEASE_BUILD_OUTPUT}} {{.FILE}}"
   run:
     desc: run the interpreter
     aliases:
