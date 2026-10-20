@@ -125,24 +125,11 @@ impl PartialEq for Value {
 // block but could set it for Ord block
 impl PartialOrd for Value {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-// research why can't we derive Eq?
-// we can't derive eq because of f64 and later Rc
-// f64 is not eq, because it is not reflexive
-// NaN == NaN in rust comes out as false when it should be true
-// when we manually implement it we are saying that we are okay with it
-impl Eq for Value {}
-
-impl Ord for Value {
-    fn cmp(&self, other: &Self) -> Ordering {
         match (self, other) {
-            (Value::Bool(l), Value::Bool(r)) => l.cmp(r),
+            (Value::Bool(l), Value::Bool(r)) => Some(l.cmp(r)),
             // NOTE: this total_cmp is different in behavior from partial_cmp
-            (Value::Number(l), Value::Number(r)) => l.total_cmp(r),
-            (Value::String(l), Value::String(r)) => l.cmp(r),
+            (Value::Number(l), Value::Number(r)) => Some(l.total_cmp(r)),
+            (Value::String(l), Value::String(r)) => Some(l.cmp(r)),
             // NOTE: solution to challenge 1
             //
             // I can easily bring conversions between numbers and strings
@@ -153,11 +140,18 @@ impl Ord for Value {
             // because it brings confusion in the language
             // ex, "02" < 1 because "0" < "1"
             // Python also gives us type error when we do int vs str comparison
-            (Value::Nil, Value::Nil) => Ordering::Equal,
-            _ => todo!("value order not implemented"),
+            (Value::Nil, Value::Nil) => Some(Ordering::Equal),
+            _ => None,
         }
     }
 }
+
+// research why can't we derive Eq?
+// we can't derive eq because of f64 and later Rc
+// f64 is not eq, because it is not reflexive
+// NaN == NaN in rust comes out as false when it should be true
+// when we manually implement it we are saying that we are okay with it
+impl Eq for Value {}
 
 impl TryFrom<Value> for LiteralExpression {
     type Error = RuntimeError;
@@ -420,18 +414,42 @@ impl ExpressionVisitor<Result<Value, RuntimeError>> for Interpreter {
             BinaryOperator::BangEqual => {
                 Ok(Value::Bool(left_value.ne(&right_value)))
             }
-            BinaryOperator::Less => {
-                Ok(Value::Bool(left_value.cmp(&right_value).is_lt()))
-            }
-            BinaryOperator::LessEqual => {
-                Ok(Value::Bool(left_value.cmp(&right_value).is_le()))
-            }
-            BinaryOperator::Greater => {
-                Ok(Value::Bool(left_value.cmp(&right_value).is_gt()))
-            }
-            BinaryOperator::GreaterEqual => {
-                Ok(Value::Bool(left_value.cmp(&right_value).is_ge()))
-            }
+            BinaryOperator::Less => Ok(Value::Bool(
+                left_value
+                    .partial_cmp(&right_value)
+                    .map(|cmp| cmp.is_lt())
+                    .ok_or_else(|| RuntimeError::InvalidOperation {
+                        operation: BinaryOperator::Less.to_string(),
+                        expression: expression.clone().wrap(),
+                    })?,
+            )),
+            BinaryOperator::LessEqual => Ok(Value::Bool(
+                left_value
+                    .partial_cmp(&right_value)
+                    .map(|cmp| cmp.is_le())
+                    .ok_or_else(|| RuntimeError::InvalidOperation {
+                        operation: BinaryOperator::LessEqual.to_string(),
+                        expression: expression.clone().wrap(),
+                    })?,
+            )),
+            BinaryOperator::Greater => Ok(Value::Bool(
+                left_value
+                    .partial_cmp(&right_value)
+                    .map(|cmp| cmp.is_gt())
+                    .ok_or_else(|| RuntimeError::InvalidOperation {
+                        operation: BinaryOperator::Greater.to_string(),
+                        expression: expression.clone().wrap(),
+                    })?,
+            )),
+            BinaryOperator::GreaterEqual => Ok(Value::Bool(
+                left_value
+                    .partial_cmp(&right_value)
+                    .map(|cmp| cmp.is_ge())
+                    .ok_or_else(|| RuntimeError::InvalidOperation {
+                        operation: BinaryOperator::GreaterEqual.to_string(),
+                        expression: expression.clone().wrap(),
+                    })?,
+            )),
             BinaryOperator::Plus => left_value + right_value,
             BinaryOperator::Minus => left_value - right_value,
             BinaryOperator::Star => left_value * right_value,
