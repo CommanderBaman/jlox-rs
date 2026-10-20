@@ -1,9 +1,9 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc, time::SystemTimeError};
+use thiserror::Error;
 
 use crate::{
     class::LoxClass,
     environment::Environment,
-    error::RuntimeError,
     expression::{
         AssignmentExpression, BinaryExpression, CallExpression, Expression,
         ExpressionVisitor, GetExpression, GroupingExpression,
@@ -19,7 +19,7 @@ use crate::{
         ReturnStatement, Statement, StatementVisitor,
         VariableDeclarationStatement, WhileStatement,
     },
-    value::Value,
+    value::{Value, ValueError},
 };
 
 impl Value {
@@ -71,6 +71,45 @@ pub struct Interpreter {
     pub environment: InterpreterEnvironment,
     print_expression: bool,
     locals: HashMap<usize, usize>,
+}
+
+#[derive(Error, Debug)]
+pub enum RuntimeError {
+    #[error("error operating on values of expression {expression}")]
+    ValueError {
+        expression: Expression,
+        source: ValueError,
+    },
+    #[error("variable {0} not found in environment")]
+    VariableNotFound(String),
+    #[error("code tried to remove root environment")]
+    RootEnvironmentRemoved,
+    #[error("value is not callable: {0}")]
+    NotCallable(String),
+    #[error(
+        "incorrect number of arguments received for {callee_name}. Expected {expected_arguments}, Received {received_arguments}"
+    )]
+    IncorrectNumberOfArguments {
+        callee_name: String,
+        expected_arguments: usize,
+        received_arguments: usize,
+    },
+    #[error("time error: {0}")]
+    IllegalTime(#[from] SystemTimeError),
+    #[error("return called from somewhere unknown")]
+    Return(Value),
+    #[error("no properties on types other than instance: {0}")]
+    NoProperties(Value),
+    #[error("no property named {0} on instance: {1}")]
+    PropertyNotFound(VariableToken, String),
+    #[error("can not set properties on instance: {0}")]
+    NotSettable(String),
+    #[error("environment not found")]
+    EnvironmentNotFound,
+    #[error("expected class value for superclass for class {0}")]
+    InvalidSuperClass(VariableToken),
+    #[error("invalid super state: {0}")]
+    InvalidSuperState(String),
 }
 
 impl Interpreter {

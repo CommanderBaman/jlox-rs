@@ -1,6 +1,6 @@
 use std::{fmt::Display, rc::Rc};
 
-use crate::{error::ParseError, token::Token};
+use crate::{parser::ParseError, token::Token};
 use strum::Display;
 
 pub mod print;

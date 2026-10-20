@@ -3,8 +3,8 @@
 use std::{collections::HashMap, fmt::Display, rc::Rc};
 
 use crate::{
-    error::ParseError,
     expression::{Expression, VariableExpression, VariableToken},
+    parser::ParseError,
     token::Token,
 };
 

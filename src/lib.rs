@@ -1,7 +1,6 @@
 mod class;
 mod cli;
 mod environment;
-mod error;
 mod expression;
 mod function;
 mod interpreter;
@@ -12,7 +11,7 @@ mod statement;
 mod token;
 mod value;
 
-use crate::error::CliError;
+use crate::cli::CliError;
 
 pub fn run() -> Result<(), CliError> {
     cli::run()

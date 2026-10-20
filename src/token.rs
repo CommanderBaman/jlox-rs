@@ -1,6 +1,5 @@
-use crate::error::TokenError;
-
 use strum::Display;
+use thiserror::Error;
 
 #[derive(Clone, Debug, Display)]
 pub enum Token {
@@ -55,6 +54,18 @@ pub enum Token {
 
     // special
     EndOfFile,
+}
+
+#[derive(Error, Debug)]
+pub enum TokenError {
+    #[error("could not recognize token: {0}")]
+    UnrecognizedToken(char),
+    #[error("token was incomplete. buffer: {0}")]
+    IncompleteToken(String),
+    #[error("could not parse token as number: {0}")]
+    UnparsableNumber(String),
+    #[error("the given string was not terminated: \"{0}\"")]
+    UnfinishedString(String),
 }
 
 fn keyword_to_token(keyword: &str) -> Option<Token> {

@@ -2,9 +2,9 @@ use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc};
 
 use crate::{
     environment::Environment,
-    error::RuntimeError,
     expression::VariableToken,
     function::{LoxCallable, LoxFunction},
+    interpreter::RuntimeError,
     interpreter::{Interpreter, InterpreterEnvironment},
     statement::{ClassDeclarationStatement, FunctionDeclarationStatement},
     value::Value,

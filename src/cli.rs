@@ -1,13 +1,57 @@
 use crate::{
-    error::{CliError, IoError, LanguageError, ParseError},
-    lox::Lox,
+    lox::{LanguageError, Lox},
+    parser::ParseError,
 };
+
 use std::{
     env,
     fs::File,
     io::{self, BufReader, Read, Write},
     path::{Path, PathBuf},
+    process::ExitCode,
 };
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum IoError {
+    #[error(transparent)]
+    BaseIo(#[from] std::io::Error),
+    #[error("too many arguments provided. need at most one. received {0}")]
+    TooManyArguments(usize),
+    #[error("path does not exist: {0}")]
+    PathDoesNotExist(String),
+    #[error("given path is not a file: {0}")]
+    NotFile(String),
+}
+
+impl From<IoError> for ExitCode {
+    fn from(value: IoError) -> Self {
+        let error_code = match value {
+            IoError::BaseIo(_)
+            | IoError::NotFile(_)
+            | IoError::PathDoesNotExist(_) => 66,
+            IoError::TooManyArguments(_) => 64,
+        };
+        ExitCode::from(error_code)
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum CliError {
+    #[error(transparent)]
+    Language(#[from] LanguageError),
+    #[error(transparent)]
+    Io(#[from] IoError),
+}
+
+impl From<CliError> for ExitCode {
+    fn from(value: CliError) -> Self {
+        match value {
+            CliError::Language(l) => l.into(),
+            CliError::Io(i) => i.into(),
+        }
+    }
+}
 
 pub fn run() -> Result<(), CliError> {
     let mut args = env::args();

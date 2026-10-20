@@ -1,7 +1,8 @@
 use std::{assert_matches, iter::Peekable, slice::Iter};
 
+use crate::parser::ParseError;
+
 use crate::{
-    error::{LanguageError, ParseError},
     expression::{
         AssignmentExpression, BinaryExpression, CallExpression, Expression,
         GetExpression, GroupingExpression, LiteralExpression,
@@ -36,7 +37,9 @@ use crate::{
 // parameters -> IDENTIFIER ( "," IDENTIFIER )*
 // returnStmt -> "return" expression? ";"
 // classDeclaration ->  "class" IDENTIFIER "{" function* "}"
-pub(super) fn parse(tokens: &[Token]) -> Result<Vec<Statement>, LanguageError> {
+pub(super) fn parse(
+    tokens: &[Token],
+) -> Result<Vec<Statement>, Vec<ParseError>> {
     let mut tokens = tokens.iter().peekable();
     let mut statements = Vec::new();
     let mut errors = Vec::new();
@@ -81,7 +84,7 @@ pub(super) fn parse(tokens: &[Token]) -> Result<Vec<Statement>, LanguageError> {
     if errors.is_empty() {
         Ok(statements)
     } else {
-        Err(LanguageError::Parse(errors))
+        Err(errors)
     }
 }
 
@@ -489,7 +492,7 @@ fn class_declaration_statement(
 //              | "super" "." IDENTIFIER
 pub(super) fn parse_expression(
     tokens: &[Token],
-) -> Result<Expression, LanguageError> {
+) -> Result<Expression, Vec<ParseError>> {
     let mut tokens = tokens.iter().peekable();
     let mut errors = Vec::new();
     // add a dummy expression for rust checks
@@ -526,7 +529,7 @@ pub(super) fn parse_expression(
     if errors.is_empty() {
         Ok(expr)
     } else {
-        Err(LanguageError::Parse(errors))
+        Err(errors)
     }
 }
 

@@ -5,9 +5,8 @@ use std::{
 };
 
 use crate::{
-    error::RuntimeError,
     expression::VariableToken,
-    interpreter::{Interpreter, InterpreterEnvironment},
+    interpreter::{Interpreter, InterpreterEnvironment, RuntimeError},
     statement::{FunctionDeclarationStatement, StatementVisitor},
     value::Value,
 };

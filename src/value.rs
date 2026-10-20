@@ -90,29 +90,6 @@ impl Value {
     }
 }
 
-// #[derive(Debug, Error)]
-// #[error(
-//     "can not perform operation {} between the values {} and {}",
-//     operation,
-//     left,
-//     right
-// )]
-// pub struct InvalidOperationError {
-//     operation: &'static str,
-//     left: Value,
-//     right: Value,
-// }
-
-// #[derive(Debug, Error)]
-// #[error("can not use an uninitialized value")]
-// pub struct UninitializedValueUsedError {}
-
-// #[derive(Debug, Error)]
-// #[error("division by zero of {dividend}")]
-// pub struct DivisionByZero {
-//     dividend: Value,
-// }
-
 #[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum ValueError {

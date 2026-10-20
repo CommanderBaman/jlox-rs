@@ -1,7 +1,7 @@
 use std::{collections::HashMap, mem, rc::Rc};
+use thiserror::Error;
 
 use crate::{
-    error::ResolverError,
     expression::{self, Expression, ExpressionVisitor, VariableToken},
     interpreter::Interpreter,
     statement::{
@@ -72,7 +72,6 @@ impl VariableState {
             }
         }
     }
-
     fn can_use(&self) -> bool {
         match self {
             VariableState::Define | VariableState::Used => true,
@@ -87,6 +86,32 @@ pub struct Resolver<'a> {
     interpreter: &'a mut Interpreter,
     current_function: FunctionKind,
     current_class: ClassKind,
+}
+
+#[derive(Error, Debug)]
+pub enum ResolverError {
+    #[error("given variable is already declared: {0}")]
+    AlreadyDeclared(VariableToken),
+    #[error("given variable is already defined: {0}")]
+    AlreadyDefined(VariableToken),
+    #[error("can not read local variable {0} before its initializer")]
+    UsageBeforeDeclaration(VariableToken),
+    #[error("can not use local variable {0} before its initializer")]
+    UsageBeforeDefinition(VariableToken),
+    #[error("given variable {0} is not declared")]
+    NotDeclared(VariableToken),
+    #[error("return called from top level of code")]
+    TopLevelReturn,
+    #[error("unused variables: {}", .0.iter().fold(String::new(), |acc, e| format!("{acc}, {e}")).split_off(2))]
+    UnusedVariables(Vec<VariableToken>),
+    #[error("unknown: {0}")]
+    Unknown(String),
+    #[error("invalid usage of this")]
+    InvalidThis,
+    #[error("invalid return from initializer")]
+    InvalidReturnFromInitializer,
+    #[error("self inheritance is not allowed: {0}")]
+    SelfInheritanceNotAllowed(VariableToken),
 }
 
 impl<'a> Resolver<'a> {
