@@ -4,9 +4,9 @@ use thiserror::Error;
 
 use crate::{
     expression::{Expression, VariableToken},
-    interpreter::Value,
     statement::Statement,
     token::Token,
+    value::{Value, ValueError},
 };
 
 #[derive(Error, Debug)]
@@ -37,19 +37,15 @@ pub enum ResolverError {
 
 #[derive(Error, Debug)]
 pub enum RuntimeError {
-    #[error("invalid operation {operation} on expression {expression:?}")]
-    InvalidOperation {
-        operation: String,
+    #[error("error operating on values of expression {expression}")]
+    ValueError {
         expression: Expression,
+        source: ValueError,
     },
-    #[error("division by zero in expression {0:?}")]
-    DivisionByZero(Expression),
     #[error("variable {0} not found in environment")]
     VariableNotFound(String),
     #[error("code tried to remove root environment")]
     RootEnvironmentRemoved,
-    #[error("variable {0} used without initializing")]
-    UninitializedVariableUsed(String),
     #[error("value is not callable: {0}")]
     NotCallable(String),
     #[error(

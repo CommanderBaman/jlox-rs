@@ -157,7 +157,7 @@ impl Display for GroupingExpression {
 }
 
 // unary          → ( "-" | "!" ) expression
-#[derive(Clone, Debug, Display)]
+#[derive(Clone, Debug, Display, Copy)]
 pub enum UnaryOperator {
     #[strum(to_string = "!")]
     Bang,
@@ -205,7 +205,7 @@ impl Display for UnaryExpression {
 
 // binary         → expression operator expression
 // operator       → "==" | "!=" | "<" | "<=" | ">" | ">=" | "+" | "-" | "*" | "/"
-#[derive(Clone, Debug, Display)]
+#[derive(Clone, Debug, Display, Copy)]
 pub enum BinaryOperator {
     #[strum(to_string = "==")]
     EqualEqual,

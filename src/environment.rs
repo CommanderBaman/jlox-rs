@@ -1,9 +1,7 @@
 #![allow(unused_variables)]
 use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc};
 
-use crate::{
-    error::RuntimeError, expression::VariableToken, interpreter::Value,
-};
+use crate::{error::RuntimeError, expression::VariableToken, value::Value};
 
 // NOTE:
 // It took some tries to implement this environment

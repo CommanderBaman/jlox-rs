@@ -5,8 +5,9 @@ use crate::{
     error::RuntimeError,
     expression::VariableToken,
     function::{LoxCallable, LoxFunction},
-    interpreter::{Interpreter, InterpreterEnvironment, Value},
+    interpreter::{Interpreter, InterpreterEnvironment},
     statement::{ClassDeclarationStatement, FunctionDeclarationStatement},
+    value::Value,
 };
 
 #[derive(Debug)]

@@ -7,8 +7,9 @@ use std::{
 use crate::{
     error::RuntimeError,
     expression::VariableToken,
-    interpreter::{Interpreter, InterpreterEnvironment, Value},
+    interpreter::{Interpreter, InterpreterEnvironment},
     statement::{FunctionDeclarationStatement, StatementVisitor},
+    value::Value,
 };
 
 pub trait LoxCallable: Display + Debug {

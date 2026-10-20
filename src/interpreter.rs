@@ -1,21 +1,15 @@
-use std::{
-    cell::RefCell,
-    cmp::Ordering,
-    collections::HashMap,
-    ops::{Add, Div, Mul, Sub},
-    rc::Rc,
-};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
-    class::{LoxClass, LoxInstance},
+    class::LoxClass,
     environment::Environment,
     error::RuntimeError,
     expression::{
-        AssignmentExpression, BinaryExpression, BinaryOperator, CallExpression,
-        Expression, ExpressionVisitor, GetExpression, GroupingExpression,
+        AssignmentExpression, BinaryExpression, CallExpression, Expression,
+        ExpressionVisitor, GetExpression, GroupingExpression,
         LiteralExpression, LiteralToken, LogicalExpression, LogicalOperator,
         SetExpression, SuperExpression, ThisExpression, UnaryExpression,
-        UnaryOperator, VariableExpression, VariableToken,
+        VariableExpression, VariableToken,
     },
     function::{LoxCallable, LoxFunction},
     resolver::Address,
@@ -25,41 +19,10 @@ use crate::{
         ReturnStatement, Statement, StatementVisitor,
         VariableDeclarationStatement, WhileStatement,
     },
-    token::Token,
+    value::Value,
 };
 
-#[derive(Debug, Clone)]
-pub enum Value {
-    Bool(bool),
-    Nil,
-    Number(f64),
-    String(String),
-    Uninitialized,
-    Call(Rc<dyn LoxCallable>),
-    ClassDeclaration(Rc<LoxClass>),
-    ClassInstance(Rc<LoxInstance>),
-}
-
-impl std::fmt::Display for Value {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let string = match self {
-            Self::Bool(b) => format!("{b}"),
-            Self::Nil => "nil".to_string(),
-            Self::Number(n) => format!("{n}"),
-            Self::String(s) => s.to_owned(),
-            Self::Uninitialized => "uinitialized".to_string(),
-            Self::Call(c) => format!("{c}"),
-            Self::ClassDeclaration(c) => format!("{c}"),
-            Self::ClassInstance(c) => format!("{c}"),
-        };
-        write!(f, "{}", string)
-    }
-}
-
 impl Value {
-    fn is_truthy(&self) -> bool {
-        !matches!(self, Value::Uninitialized | Value::Nil | Value::Bool(false))
-    }
     pub fn call(
         &self,
         interpreter: &mut Interpreter,
@@ -98,190 +61,6 @@ impl Value {
         match self {
             Self::ClassInstance(c) => c.environment(),
             e => unreachable!("you must not call environment on {e}"),
-        }
-    }
-}
-
-// we have to specify the == here for each pair because
-// (l, r) => l.eq(r) does not work
-// it just loops back this function again, causing infinite recursion
-impl PartialEq for Value {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Value::Bool(l), Value::Bool(r)) => l == r,
-            (Value::Nil, Value::Nil) => true,
-            (Value::Number(l), Value::Number(r)) => l == r,
-            (Value::String(l), Value::String(r)) => l == r,
-            (Value::Uninitialized, Value::Uninitialized) => true,
-            (Value::Call(l), Value::Call(r)) => Rc::ptr_eq(l, r),
-            _ => false,
-        }
-    }
-}
-
-// we do not face the same problem as PartialEq because we use Ord for
-// all the ordering that we do. Hence, I believe this is never called.
-// I also checked this via lldb when I couldn't set a breakpoint in this
-// block but could set it for Ord block
-impl PartialOrd for Value {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        match (self, other) {
-            (Value::Bool(l), Value::Bool(r)) => Some(l.cmp(r)),
-            // NOTE: this total_cmp is different in behavior from partial_cmp
-            (Value::Number(l), Value::Number(r)) => Some(l.total_cmp(r)),
-            (Value::String(l), Value::String(r)) => Some(l.cmp(r)),
-            // NOTE: solution to challenge 1
-            //
-            // I can easily bring conversions between numbers and strings
-            // and same for bool
-            // (Value::Number(l), Value::String(r)) => l.to_string().cmp(r),
-            // (Value::String(l), Value::Number(r)) => l.cmp(&r.to_string()),
-            // But I would not introduce these
-            // because it brings confusion in the language
-            // ex, "02" < 1 because "0" < "1"
-            // Python also gives us type error when we do int vs str comparison
-            (Value::Nil, Value::Nil) => Some(Ordering::Equal),
-            _ => None,
-        }
-    }
-}
-
-// research why can't we derive Eq?
-// we can't derive eq because of f64 and later Rc
-// f64 is not eq, because it is not reflexive
-// NaN == NaN in rust comes out as false when it should be true
-// when we manually implement it we are saying that we are okay with it
-impl Eq for Value {}
-
-impl TryFrom<Value> for LiteralExpression {
-    type Error = RuntimeError;
-    fn try_from(value: Value) -> Result<Self, RuntimeError> {
-        match value {
-            Value::String(s) => Ok(LiteralExpression {
-                literal: LiteralToken::String(s),
-            }),
-            Value::Bool(b) => {
-                let literal = if b {
-                    LiteralToken::True
-                } else {
-                    LiteralToken::False
-                };
-                Ok(LiteralExpression { literal })
-            }
-            Value::Number(n) => Ok(LiteralExpression {
-                literal: LiteralToken::Number(n),
-            }),
-            Value::Nil => Ok(LiteralExpression {
-                literal: LiteralToken::Nil,
-            }),
-            Value::Uninitialized => {
-                Err(RuntimeError::UninitializedVariableUsed("?".to_owned()))
-            }
-            Value::Call(_)
-            | Value::ClassInstance(_)
-            | Value::ClassDeclaration(_) => {
-                todo!("value call and classes to literal expression")
-            }
-        }
-    }
-}
-
-fn get_binary_expression(
-    left: Value,
-    right: Value,
-    operator: Token,
-) -> Expression {
-    BinaryExpression::build(
-        Expression::Literal(left.try_into().expect("left value to be initialized")),
-        operator,
-        Expression::Literal(right.try_into().expect("right value to be initialized")),
-    )
-    .expect("value to literal conversion failed or invalid operator passed for building binary expression for error")
-}
-
-impl Add for Value {
-    type Output = Result<Value, RuntimeError>;
-    fn add(self, rhs: Self) -> Self::Output {
-        match (&self, &rhs) {
-            // (Value::Number(l), Value::Number(r)) => {}
-            (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l + r)),
-            // NOTE: solution to challenge 2
-            (Value::String(l), Value::String(r)) => {
-                Ok(Value::String(format!("{l}{r}")))
-            }
-            (Value::String(l), Value::Number(r)) => {
-                Ok(Value::String(format!("{l}{r}")))
-            }
-            (Value::Number(l), Value::String(r)) => {
-                Ok(Value::String(format!("{l}{r}")))
-            }
-            (Value::Uninitialized, _) | (_, Value::Uninitialized) => {
-                Err(RuntimeError::UninitializedVariableUsed("?".to_owned()))
-            }
-            _ => Err(RuntimeError::InvalidOperation {
-                operation: "Add".to_owned(),
-                expression: get_binary_expression(self, rhs, Token::Plus),
-            }),
-        }
-    }
-}
-
-impl Sub for Value {
-    type Output = Result<Value, RuntimeError>;
-    fn sub(self, rhs: Self) -> Self::Output {
-        match (&self, &rhs) {
-            (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l - r)),
-            (Value::Uninitialized, _) | (_, Value::Uninitialized) => {
-                Err(RuntimeError::UninitializedVariableUsed("?".to_owned()))
-            }
-            _ => Err(RuntimeError::InvalidOperation {
-                operation: "Sub".to_owned(),
-                expression: get_binary_expression(self, rhs, Token::Minus),
-            }),
-        }
-    }
-}
-
-impl Mul for Value {
-    type Output = Result<Value, RuntimeError>;
-    fn mul(self, rhs: Self) -> Self::Output {
-        match (&self, &rhs) {
-            (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l * r)),
-            (Value::Uninitialized, _) | (_, Value::Uninitialized) => {
-                Err(RuntimeError::UninitializedVariableUsed("?".to_owned()))
-            }
-            _ => Err(RuntimeError::InvalidOperation {
-                operation: "Mul".to_owned(),
-                expression: get_binary_expression(self, rhs, Token::Star),
-            }),
-        }
-    }
-}
-
-impl Div for Value {
-    type Output = Result<Value, RuntimeError>;
-    fn div(self, rhs: Self) -> Self::Output {
-        match (&self, &rhs) {
-            (Value::Number(l), Value::Number(r)) => {
-                // NOTE: solution to challenge 3
-                //
-                // previously when divided by zero, due to rust internals,
-                // the number becamse infinite
-                // now we will give a runtime error
-                if r.eq(&0.0) {
-                    return Err(RuntimeError::DivisionByZero(
-                        get_binary_expression(self, rhs, Token::Slash),
-                    ));
-                }
-                Ok(Value::Number(l / r))
-            }
-            (Value::Uninitialized, _) | (_, Value::Uninitialized) => {
-                Err(RuntimeError::UninitializedVariableUsed("?".to_owned()))
-            }
-            _ => Err(RuntimeError::InvalidOperation {
-                operation: "Div".to_owned(),
-                expression: get_binary_expression(self, rhs, Token::Slash),
-            }),
         }
     }
 }
@@ -386,19 +165,13 @@ impl ExpressionVisitor<Result<Value, RuntimeError>> for Interpreter {
         &mut self,
         expression: &UnaryExpression,
     ) -> Result<Value, RuntimeError> {
-        let mut value = self.evaluate(&expression.expression)?;
-        value = match expression.operator {
-            UnaryOperator::Bang => Value::Bool(!value.is_truthy()),
-            UnaryOperator::Minus => {
-                (Value::Number(-1.0) * value).map_err(|_| {
-                    RuntimeError::InvalidOperation {
-                        operation: UnaryOperator::Minus.to_string(),
-                        expression: expression.clone().wrap(),
-                    }
-                })?
+        let value = self.evaluate(&expression.expression)?;
+        value.do_unary_operation(expression.operator).map_err(|e| {
+            RuntimeError::ValueError {
+                expression: expression.clone().wrap(),
+                source: e,
             }
-        };
-        Ok(value)
+        })
     }
     fn visit_binary(
         &mut self,
@@ -406,55 +179,12 @@ impl ExpressionVisitor<Result<Value, RuntimeError>> for Interpreter {
     ) -> Result<Value, RuntimeError> {
         let left_value = self.evaluate(&expression.left_expression)?;
         let right_value = self.evaluate(&expression.right_expression)?;
-
-        match expression.operator {
-            BinaryOperator::EqualEqual => {
-                Ok(Value::Bool(left_value.eq(&right_value)))
-            }
-            BinaryOperator::BangEqual => {
-                Ok(Value::Bool(left_value.ne(&right_value)))
-            }
-            BinaryOperator::Less => Ok(Value::Bool(
-                left_value
-                    .partial_cmp(&right_value)
-                    .map(|cmp| cmp.is_lt())
-                    .ok_or_else(|| RuntimeError::InvalidOperation {
-                        operation: BinaryOperator::Less.to_string(),
-                        expression: expression.clone().wrap(),
-                    })?,
-            )),
-            BinaryOperator::LessEqual => Ok(Value::Bool(
-                left_value
-                    .partial_cmp(&right_value)
-                    .map(|cmp| cmp.is_le())
-                    .ok_or_else(|| RuntimeError::InvalidOperation {
-                        operation: BinaryOperator::LessEqual.to_string(),
-                        expression: expression.clone().wrap(),
-                    })?,
-            )),
-            BinaryOperator::Greater => Ok(Value::Bool(
-                left_value
-                    .partial_cmp(&right_value)
-                    .map(|cmp| cmp.is_gt())
-                    .ok_or_else(|| RuntimeError::InvalidOperation {
-                        operation: BinaryOperator::Greater.to_string(),
-                        expression: expression.clone().wrap(),
-                    })?,
-            )),
-            BinaryOperator::GreaterEqual => Ok(Value::Bool(
-                left_value
-                    .partial_cmp(&right_value)
-                    .map(|cmp| cmp.is_ge())
-                    .ok_or_else(|| RuntimeError::InvalidOperation {
-                        operation: BinaryOperator::GreaterEqual.to_string(),
-                        expression: expression.clone().wrap(),
-                    })?,
-            )),
-            BinaryOperator::Plus => left_value + right_value,
-            BinaryOperator::Minus => left_value - right_value,
-            BinaryOperator::Star => left_value * right_value,
-            BinaryOperator::Slash => left_value / right_value,
-        }
+        left_value
+            .do_binary_operation(right_value, expression.operator)
+            .map_err(|e| RuntimeError::ValueError {
+                expression: expression.clone().wrap(),
+                source: e,
+            })
     }
     fn visit_variable(
         &mut self,

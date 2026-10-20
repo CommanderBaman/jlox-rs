@@ -10,6 +10,7 @@ mod parser;
 mod resolver;
 mod statement;
 mod token;
+mod value;
 
 use crate::error::CliError;
 
