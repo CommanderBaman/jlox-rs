@@ -57,11 +57,16 @@ pub enum Token {
 }
 
 #[derive(Error, Debug)]
-pub enum TokenError {
+#[error("tokenisation error at line {line_number} : {source}")]
+pub struct TokenError {
+    line_number: usize,
+    source: TokenErrorSource,
+}
+
+#[derive(Error, Debug)]
+pub enum TokenErrorSource {
     #[error("could not recognize token: {0}")]
     UnrecognizedToken(char),
-    #[error("token was incomplete. buffer: {0}")]
-    IncompleteToken(String),
     #[error("could not parse token as number: {0}")]
     UnparsableNumber(String),
     #[error("the given string was not terminated: \"{0}\"")]
@@ -97,6 +102,7 @@ fn keyword_to_token(keyword: &str) -> Option<Token> {
 pub fn scan_tokens(line: &str) -> Result<Vec<Token>, TokenError> {
     let mut tokens: Vec<Token> = Vec::new();
     let mut chars = line.chars().peekable();
+    let mut line_number: usize = 1;
     loop {
         let char = chars.next();
         if char.is_none() {
@@ -161,6 +167,7 @@ pub fn scan_tokens(line: &str) -> Result<Vec<Token>, TokenError> {
                     loop {
                         match chars.next() {
                             Some('\n') => {
+                                line_number += 1;
                                 break;
                             }
                             Some(_) => continue,
@@ -175,14 +182,21 @@ pub fn scan_tokens(line: &str) -> Result<Vec<Token>, TokenError> {
             ' ' => continue,
             '\r' => continue,
             '\t' => continue,
-            '\n' => continue,
+            '\n' => {
+                line_number += 1;
+                continue;
+            }
             // string literals
             '"' => {
                 let mut buffer = String::new();
                 loop {
-                    let c = chars
-                        .next()
-                        .ok_or(TokenError::UnfinishedString(buffer.clone()))?;
+                    let c = chars.next().ok_or_else(|| TokenError {
+                        line_number,
+                        source: TokenErrorSource::UnfinishedString(
+                            buffer.trim().to_string(),
+                        ),
+                    })?;
+
                     if c == '"' {
                         break;
                     }
@@ -205,11 +219,12 @@ pub fn scan_tokens(line: &str) -> Result<Vec<Token>, TokenError> {
                             break;
                         }
                     }
-                    tokens.push(Token::Number(
-                        buffer.parse().map_err(|_| {
-                            TokenError::UnparsableNumber(buffer)
-                        })?,
-                    ));
+                    tokens.push(Token::Number(buffer.parse().map_err(
+                        |_| TokenError {
+                            line_number,
+                            source: TokenErrorSource::UnparsableNumber(buffer),
+                        },
+                    )?));
                     continue;
                 }
                 if c.is_alphabetic() {
@@ -231,7 +246,10 @@ pub fn scan_tokens(line: &str) -> Result<Vec<Token>, TokenError> {
                     }
                     continue;
                 }
-                return Err(TokenError::UnrecognizedToken(c));
+                return Err(TokenError {
+                    line_number,
+                    source: TokenErrorSource::UnrecognizedToken(c),
+                });
             }
         }
     }
